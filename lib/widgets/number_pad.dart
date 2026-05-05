@@ -12,6 +12,7 @@ class NumberPad extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameProvider);
     if (state == null) return const SizedBox.shrink();
+    final hapticOn = ref.read(hapticEnabledProvider);
 
     return Column(
       children: [
@@ -23,7 +24,7 @@ class NumberPad extends ConsumerWidget {
               icon: Icons.undo_rounded,
               label: 'Geri Al',
               onTap: () {
-                HapticFeedback.lightImpact();
+                if (hapticOn) HapticFeedback.lightImpact();
                 ref.read(gameProvider.notifier).undo();
               },
             ),
@@ -31,7 +32,7 @@ class NumberPad extends ConsumerWidget {
               icon: Icons.backspace_outlined,
               label: 'Sil',
               onTap: () {
-                HapticFeedback.lightImpact();
+                if (hapticOn) HapticFeedback.lightImpact();
                 ref.read(gameProvider.notifier).erase();
               },
             ),
@@ -40,7 +41,7 @@ class NumberPad extends ConsumerWidget {
               label: 'Not',
               active: state.isNoteMode,
               onTap: () {
-                HapticFeedback.lightImpact();
+                if (hapticOn) HapticFeedback.lightImpact();
                 ref.read(gameProvider.notifier).toggleNoteMode();
               },
             ),
@@ -110,7 +111,7 @@ class NumberPad extends ConsumerWidget {
               onTap: done
                   ? null
                   : () {
-                      HapticFeedback.lightImpact();
+                      if (hapticOn) HapticFeedback.lightImpact();
                       ref.read(gameProvider.notifier).inputNumber(n);
                     },
             );

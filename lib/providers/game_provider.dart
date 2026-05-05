@@ -15,8 +15,8 @@ class GameState {
   final int? selectedRow;
   final int? selectedCol;
   final Set<(int, int)> conflicts;
-  final Set<(int, int)> highlights;   // cells with same number
-  final List<List<List<int>>> history; // undo stack
+  final Set<(int, int)> highlights;
+  final List<List<List<int>>> history;
   final int mistakeCount;
   final int elapsedSeconds;
   final bool isComplete;
@@ -84,8 +84,6 @@ class GameNotifier extends StateNotifier<GameState?> {
 
   Timer? _timer;
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────
-
   void startGame(SudokuPuzzle puzzle) {
     _timer?.cancel();
     final emptyNotes = List.generate(9, (_) => List.generate(9, (_) => <int>{}));
@@ -111,9 +109,7 @@ class GameNotifier extends StateNotifier<GameState?> {
     super.dispose();
   }
 
-// ── Save / Load ──────────────────────────────────────────────
-
-Future<void> saveProgress() async {
+  Future<void> saveProgress() async {
     if (state == null) return;
     final s = state!;
     final prefs = await SharedPreferences.getInstance();
@@ -133,34 +129,28 @@ Future<void> saveProgress() async {
     await prefs.setString(key, jsonEncode(data));
   }
 
-Future<bool> loadProgress(Difficulty difficulty, {bool isDaily = false}) async {
-  final prefs = await SharedPreferences.getInstance();
-  final key = isDaily ? 'saved_game_daily' : 'saved_game_${difficulty.labelEn}';
-  final raw = prefs.getString(key);
-  if (raw == null) return false;
+  Future<bool> loadProgress(Difficulty difficulty, {bool isDaily = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = isDaily ? 'saved_game_daily' : 'saved_game_${difficulty.labelEn}';
+    final raw = prefs.getString(key);
+    if (raw == null) return false;
 
     try {
       final data = jsonDecode(raw) as Map<String, dynamic>;
-
       final flatBoard    = List<int>.from(data['board']);
       final flatGiven    = List<bool>.from(data['given']);
       final flatSolution = List<int>.from(data['solution']);
-
       final board    = List.generate(9, (r) => flatBoard.sublist(r*9, r*9+9));
       final given    = List.generate(9, (r) => flatGiven.sublist(r*9, r*9+9));
       final solution = List.generate(9, (r) => flatSolution.sublist(r*9, r*9+9));
-
       final puzzle = SudokuPuzzle(
         board: board, given: given, solution: solution,
         difficulty: difficulty,
         dailyId: data['dailyId'] as String?,
       );
-
       final flatNotes = List<List<dynamic>>.from(data['notes']);
       final notes = List.generate(9, (r) =>
-          List.generate(9, (c) =>
-              Set<int>.from(flatNotes[r * 9 + c])));
-
+          List.generate(9, (c) => Set<int>.from(flatNotes[r * 9 + c])));
       state = GameState(
         puzzle:         puzzle,
         notes:          notes,
@@ -175,20 +165,16 @@ Future<bool> loadProgress(Difficulty difficulty, {bool isDaily = false}) async {
     }
   }
 
-Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async {
-  final prefs = await SharedPreferences.getInstance();
-  final key = isDaily ? 'saved_game_daily' : 'saved_game_${difficulty.labelEn}';
-  await prefs.remove(key);
-}
-
-  // ── Selection ────────────────────────────────────────────────────────
+  Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = isDaily ? 'saved_game_daily' : 'saved_game_${difficulty.labelEn}';
+    await prefs.remove(key);
+  }
 
   void selectCell(int row, int col) {
     if (state == null || state!.isComplete) return;
     final board = state!.puzzle.board;
     final val   = board[row][col];
-
-    // Highlight all cells with same value
     final hi = <(int, int)>{};
     if (val != 0) {
       for (int r = 0; r < 9; r++) {
@@ -197,15 +183,8 @@ Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async 
         }
       }
     }
-
-    state = state!.copyWith(
-      selectedRow: row,
-      selectedCol: col,
-      highlights: hi,
-    );
+    state = state!.copyWith(selectedRow: row, selectedCol: col, highlights: hi);
   }
-
-  // ── Input ────────────────────────────────────────────────────────────
 
   void inputNumber(int num) {
     if (state == null) return;
@@ -213,38 +192,23 @@ Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async 
     if (s.selectedRow == null || s.selectedCol == null) return;
     final r = s.selectedRow!;
     final c = s.selectedCol!;
-    if (s.puzzle.given[r][c]) return; // can't edit given cells
+    if (s.puzzle.given[r][c]) return;
 
     if (s.isNoteMode) {
       _toggleNote(r, c, num);
       return;
     }
 
-    // Save history for undo
     final snap = s.puzzle.board.map((row) => List<int>.from(row)).toList();
     final newHistory = [...s.history, snap];
-
-    // Place number
     final newBoard = s.puzzle.board.map((row) => List<int>.from(row)).toList();
     newBoard[r][c] = num;
-
     final newPuzzle = SudokuPuzzle(
-      board:      newBoard,
-      given:      s.puzzle.given,
-      solution:   s.puzzle.solution,
-      difficulty: s.puzzle.difficulty,
-      dailyId:    s.puzzle.dailyId,
-      date:       s.puzzle.date,
+      board: newBoard, given: s.puzzle.given, solution: s.puzzle.solution,
+      difficulty: s.puzzle.difficulty, dailyId: s.puzzle.dailyId, date: s.puzzle.date,
     );
-
-    // Check conflicts
     final conflicts = SudokuGenerator.findConflicts(newBoard, r, c);
-    bool isMistake  = false;
-    if (num != 0 && newBoard[r][c] != s.puzzle.solution[r][c]) {
-      isMistake = true;
-    }
-
-    // Highlight
+    final isMistake = num != 0 && newBoard[r][c] != s.puzzle.solution[r][c];
     final hi = <(int, int)>{};
     if (num != 0) {
       for (int rr = 0; rr < 9; rr++) {
@@ -253,8 +217,6 @@ Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async 
         }
       }
     }
-
-    // Clear notes in same row/col/box
     final newNotes = s.notes.map((row) => row.map((n) => Set<int>.from(n)).toList()).toList();
     if (num != 0) {
       for (int i = 0; i < 9; i++) {
@@ -269,15 +231,11 @@ Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async 
         }
       }
     }
-
     state = s.copyWith(
-      puzzle:       newPuzzle,
-      conflicts:    conflicts,
-      highlights:   hi,
-      history:      newHistory,
-      notes:        newNotes,
+      puzzle: newPuzzle, conflicts: conflicts, highlights: hi,
+      history: newHistory, notes: newNotes,
       mistakeCount: isMistake ? s.mistakeCount + 1 : s.mistakeCount,
-      isComplete:   newPuzzle.isSolved,
+      isComplete: newPuzzle.isSolved,
     );
     saveProgress();
   }
@@ -295,8 +253,7 @@ Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async 
 
   void erase() {
     if (state == null) return;
-    final s = state!;
-    if (s.selectedRow == null || s.selectedCol == null) return;
+    if (state!.selectedRow == null || state!.selectedCol == null) return;
     inputNumber(0);
   }
 
@@ -306,12 +263,8 @@ Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async 
     final prevBoard = s.history.last;
     final newHistory = s.history.sublist(0, s.history.length - 1);
     final newPuzzle = SudokuPuzzle(
-      board:      prevBoard,
-      given:      s.puzzle.given,
-      solution:   s.puzzle.solution,
-      difficulty: s.puzzle.difficulty,
-      dailyId:    s.puzzle.dailyId,
-      date:       s.puzzle.date,
+      board: prevBoard, given: s.puzzle.given, solution: s.puzzle.solution,
+      difficulty: s.puzzle.difficulty, dailyId: s.puzzle.dailyId, date: s.puzzle.date,
     );
     state = s.copyWith(puzzle: newPuzzle, history: newHistory, conflicts: {});
   }
@@ -321,20 +274,18 @@ Future<void> clearProgress(Difficulty difficulty, {bool isDaily = false}) async 
     state = state!.copyWith(isNoteMode: !state!.isNoteMode);
   }
 
-  // ── Completion callback ────────────────────────────────────────────────
-
   Future<void> saveCompletion() async {
     if (state == null || !state!.isComplete) return;
     _timer?.cancel();
     await SupabaseService.instance.recordCompletion(
-      difficulty:     state!.puzzle.difficulty,
-      timeTaken:      state!.elapsedSeconds,
-      dailyPuzzleId:  state!.puzzle.dailyId,
+      difficulty:    state!.puzzle.difficulty,
+      timeTaken:     state!.elapsedSeconds,
+      dailyPuzzleId: state!.puzzle.dailyId,
     );
   }
 }
 
-// ─── Providers ──────────────────────────────────────────────────────────────
+// ─── Oyun Provider'ları ──────────────────────────────────────────────────────
 
 final gameProvider =
     StateNotifierProvider<GameNotifier, GameState?>((ref) => GameNotifier());
@@ -350,3 +301,25 @@ final dailyPuzzleProvider = FutureProvider((ref) async {
 final completionStatsProvider = FutureProvider((ref) async {
   return SupabaseService.instance.getCompletionStats();
 });
+
+// ─── Titreşim Ayarı ──────────────────────────────────────────────────────────
+
+class HapticNotifier extends StateNotifier<bool> {
+  HapticNotifier() : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool('haptic_enabled') ?? true;
+  }
+
+  Future<void> setEnabled(bool value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('haptic_enabled', value);
+  }
+}
+
+final hapticEnabledProvider =
+    StateNotifierProvider<HapticNotifier, bool>((_) => HapticNotifier());

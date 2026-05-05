@@ -4,8 +4,7 @@ class AppConstants {
   AppConstants._();
 
   // ── Supabase ──────────────────────────────────────────────
-  // Replace these with your actual Supabase project values
-  static const String supabaseUrl    = 'https://xquoykwzpxgeevryxfte.supabase.co';
+  static const String supabaseUrl     = 'https://xquoykwzpxgeevryxfte.supabase.co';
   static const String supabaseAnonKey = 'sb_publishable_XlBiCha8d9TktR4Ox-Bmjw_FolsxDZi';
 
   // ── Diamond Rewards ───────────────────────────────────────
@@ -13,14 +12,13 @@ class AppConstants {
   static const int diamondsMedium  = 4;
   static const int diamondsHard    = 6;
   static const int diamondsDaily   = 10;
-  static const int diamondsMonthly = 50;  // bonus for full month
+  static const int diamondsMonthly = 50;
 
   // ── Sudoku ────────────────────────────────────────────────
-  static const int boardSize  = 9;
-  static const int boxSize    = 3;
-  static const int emptyCell  = 0;
+  static const int boardSize = 9;
+  static const int boxSize   = 3;
+  static const int emptyCell = 0;
 
-  // Clue counts per difficulty (approx.)
   static const int cluesEasy   = 38;
   static const int cluesMedium = 30;
   static const int cluesHard   = 24;
@@ -32,6 +30,7 @@ class AppConstants {
   static const String routeGame       = '/game';
   static const String routeDaily      = '/daily';
   static const String routeProfile    = '/profile';
+  static const String routeAbout      = '/about';       // ← eklendi
 
   // ── Misc ──────────────────────────────────────────────────
   static const String appName  = 'ZeNN Sudoku';

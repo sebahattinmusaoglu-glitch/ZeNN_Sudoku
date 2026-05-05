@@ -44,7 +44,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
             next != null &&
             next.mistakeCount > prev.mistakeCount) {
           _mistakeShakeCtrl.forward(from: 0);
-          HapticFeedback.mediumImpact();
+          if (ref.read(hapticEnabledProvider)) HapticFeedback.mediumImpact();
         }
       });
 
@@ -67,7 +67,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
   }
 
   void _onComplete() async {
-    HapticFeedback.heavyImpact();
+    if (ref.read(hapticEnabledProvider)) HapticFeedback.heavyImpact();
     await ref.read(gameProvider.notifier).saveCompletion();
     ref.invalidate(profileProvider);
     ref.invalidate(completionStatsProvider);
@@ -218,7 +218,7 @@ class _TopBar extends ConsumerWidget {
         // Durdur / Devam et butonu
         GestureDetector(
           onTap: () {
-            HapticFeedback.lightImpact();
+            if (ref.read(hapticEnabledProvider)) HapticFeedback.lightImpact();
             ref.read(gameProvider.notifier).togglePause();
           },
           child: Container(

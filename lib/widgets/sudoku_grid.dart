@@ -147,7 +147,7 @@ class _SudokuCellState extends ConsumerState<_SudokuCell>
       },
       onTapUp: (_) {
         _pressCtrl.reverse();
-        HapticFeedback.selectionClick();
+        if (ref.read(hapticEnabledProvider)) HapticFeedback.selectionClick();
         ref.read(gameProvider.notifier).selectCell(widget.row, widget.col);
       },
       onTapCancel: () => _pressCtrl.reverse(),

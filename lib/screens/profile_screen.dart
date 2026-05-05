@@ -230,7 +230,7 @@ class _ProfileHeader extends StatelessWidget {
         ),
 
         // Header'ın yüksekliğini tutan boş alan
-        const SizedBox(height: 270),
+        const SizedBox(height: 280),
       ],
     );
   }
@@ -284,7 +284,7 @@ class _DiamondCard extends StatelessWidget {
             ),
           ),
           CustomPaint(
-            size: const Size(60, 60), 
+            size: const Size(60, 60),
             painter: _LargeDiamondPainter(),
           ),
         ],
@@ -340,7 +340,7 @@ class _StatsGrid extends StatelessWidget {
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
+          padding: EdgeInsets.zero, 
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
@@ -408,9 +408,25 @@ class _StatItem {
 
 // ─── Ayarlar Bölümü ───────────────────────────────────────────────────────────
 
-class _SettingsSection extends StatelessWidget {
+class _SettingsSection extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hapticEnabled = ref.watch(hapticEnabledProvider);
+
+    void showComingSoon() {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Bu özellik yakında kullanılabilecek 🚀'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: ZennColors.primary,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -424,32 +440,42 @@ class _SettingsSection extends StatelessWidget {
           ),
           child: Column(
             children: [
+              // Bildirimler — yakında
               _SettingsTile(
                 icon: Icons.notifications_outlined,
                 label: 'Bildirimler',
+                subtitle: 'Yakında',
                 trailing: Switch(
-                  value: true,
-                  onChanged: (_) {},
-                  activeColor: ZennColors.primary,
+                    value: false,
+                    onChanged: (_) => showComingSoon(),
+                    thumbColor: WidgetStateProperty.all(Colors.white),
+                    trackColor: WidgetStateProperty.all(ZennColors.gridLine),
+                    trackOutlineColor: WidgetStateProperty.all(ZennColors.gridLine),
                 ),
               ),
               const Divider(height: 1, indent: 56),
+              // Karanlık Mod — yakında
               _SettingsTile(
                 icon: Icons.dark_mode_outlined,
                 label: 'Karanlık Mod',
+                subtitle: 'Yakında',
                 trailing: Switch(
-                  value: false,
-                  onChanged: (_) {},
-                  activeColor: ZennColors.primary,
+                    value: false,
+                    onChanged: (_) => showComingSoon(),
+                    thumbColor: WidgetStateProperty.all(Colors.white),
+                    trackColor: WidgetStateProperty.all(ZennColors.gridLine),
+                    trackOutlineColor: WidgetStateProperty.all(ZennColors.gridLine),
                 ),
               ),
               const Divider(height: 1, indent: 56),
+              // Titreşim — çalışır
               _SettingsTile(
                 icon: Icons.vibration_rounded,
                 label: 'Titreşim',
                 trailing: Switch(
-                  value: true,
-                  onChanged: (_) {},
+                  value: hapticEnabled,
+                  onChanged: (v) =>
+                      ref.read(hapticEnabledProvider.notifier).setEnabled(v),
                   activeColor: ZennColors.primary,
                 ),
               ),
@@ -459,7 +485,7 @@ class _SettingsSection extends StatelessWidget {
                 label: 'Uygulama Hakkında',
                 trailing: const Icon(Icons.chevron_right_rounded,
                     color: ZennColors.textHint),
-                onTap: () {},
+                onTap: () => context.push(AppConstants.routeAbout),
               ),
             ],
           ),
@@ -472,6 +498,7 @@ class _SettingsSection extends StatelessWidget {
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String? subtitle;
   final Widget trailing;
   final VoidCallback? onTap;
 
@@ -479,6 +506,7 @@ class _SettingsTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.trailing,
+    this.subtitle,
     this.onTap,
   });
 
@@ -497,6 +525,15 @@ class _SettingsTile extends StatelessWidget {
       title: Text(label,
           style:
               ZennTextStyles.bodyMedium.copyWith(color: ZennColors.textDark)),
+      subtitle: subtitle != null
+          ? Text(
+              subtitle!,
+              style: ZennTextStyles.caption.copyWith(
+                color: ZennColors.textHint,
+                fontSize: 11,
+              ),
+            )
+          : null,
       trailing: trailing,
       onTap: onTap,
       contentPadding:

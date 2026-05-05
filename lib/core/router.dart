@@ -6,6 +6,7 @@ import '../screens/home_screen.dart';
 import '../screens/game_screen.dart';
 import '../screens/daily_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/about_screen.dart';           // ← eklendi
 
 final appRouter = GoRouter(
   initialLocation: AppConstants.routeSplash,
@@ -29,6 +30,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: AppConstants.routeProfile,
       builder: (_, __) => const ProfileScreen(),
+    ),
+    GoRoute(                                      // ← eklendi
+      path: AppConstants.routeAbout,
+      builder: (_, __) => const AboutScreen(),
     ),
   ],
 );
