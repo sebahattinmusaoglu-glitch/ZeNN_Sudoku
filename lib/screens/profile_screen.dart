@@ -1,0 +1,424 @@
+// lib/screens/profile_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../core/theme.dart';
+import '../core/constants.dart';
+import '../providers/game_provider.dart';
+import '../services/supabase_service.dart';
+import '../widgets/common_widgets.dart';
+
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key});
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _signingOut = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = ref.watch(profileProvider);
+    final stats   = ref.watch(completionStatsProvider);
+
+    return Scaffold(
+      backgroundColor: ZennColors.background,
+      appBar: AppBar(
+        title: const Text('Profil'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: profile.when(
+          data: (p) {
+            if (p == null) return _SignInPrompt();
+            return Column(
+              children: [
+                const SizedBox(height: 8),
+                // ── Avatar + Name ──────────────────────────────────────
+                Center(
+                  child: Column(
+                    children: [
+                      Stack(
+                        children: [
+                          Container(
+                            width: 88, height: 88,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: ZennColors.cardMedium, width: 3),
+                            ),
+                            child: ClipOval(
+                              child: p.avatarUrl != null
+                                  ? Image.network(p.avatarUrl!, fit: BoxFit.cover)
+                                  : Container(
+                                      color: ZennColors.cardLight,
+                                      child: const Icon(Icons.person_rounded,
+                                          size: 44, color: ZennColors.primary),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(p.username, style: ZennTextStyles.headline2),
+                      if (p.email != null) ...[
+                        const SizedBox(height: 2),
+                        Text(p.email!, style: ZennTextStyles.caption),
+                      ],
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // ── Diamond Balance ────────────────────────────────────
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF005235), Color(0xFF1A6B4A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Toplam Elmas',
+                                style: TextStyle(
+                                  fontFamily: 'Inter', fontSize: 13,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w500,
+                                )),
+                            const SizedBox(height: 6),
+                            Text(
+                              p.totalDiamonds.toString(),
+                              style: const TextStyle(
+                                fontFamily: 'Inter', fontSize: 36,
+                                fontWeight: FontWeight.w800, color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      CustomPaint(
+                        size: const Size(60, 60),
+                        painter: _LargeDiamondPainter(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20), 
+
+                // ── Stats ──────────────────────────────────────────────
+                stats.when(
+                  data: (s) => _StatsGrid(stats: s),
+                  loading: () => const LinearProgressIndicator(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
+
+                const SizedBox(height: 12), // 
+
+                // ── Settings ───────────────────────────────────────────
+                _SettingsSection(),
+
+                const SizedBox(height: 20), 
+
+                // ── Sign Out ───────────────────────────────────────────
+                ZennButton(
+                  label: 'Çıkış Yap',
+                  loading: _signingOut,
+                  color: const Color(0xFFBA1A1A),
+                  onTap: () async {
+                    setState(() => _signingOut = true);
+                    await SupabaseService.instance.signOut();
+                    if (!mounted) return;
+                    ref.invalidate(profileProvider);
+                    ref.invalidate(completionStatsProvider);
+                    ref.invalidate(dailyPuzzleProvider);
+                    context.go(AppConstants.routeHome);
+                  },
+                ),
+
+                const SizedBox(height: 8),
+                Text(
+                  AppConstants.studio,
+                  style: ZennTextStyles.caption,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 52), // 
+              ],
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.only(top: 60),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, __) => _SignInPrompt(),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Stats Grid ───────────────────────────────────────────────────────────────
+
+class _StatsGrid extends StatelessWidget {
+  final Map<String, int> stats;
+  const _StatsGrid({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _StatItem(label: 'Kolay',   value: stats['easy']   ?? 0, icon: Icons.circle, color: ZennColors.easy),
+      _StatItem(label: 'Orta',    value: stats['medium'] ?? 0, icon: Icons.circle, color: ZennColors.medium),
+      _StatItem(label: 'Zor',     value: stats['hard']   ?? 0, icon: Icons.circle, color: ZennColors.hard),
+      _StatItem(label: 'Günlük',  value: stats['daily']  ?? 0, icon: Icons.calendar_today_rounded, color: ZennColors.daily),
+    ];
+    final total = items.fold(0, (s, i) => s + i.value);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Tamamlanan Bulmacalar', style: ZennTextStyles.headline3),
+        const SizedBox(height: 4),
+        Text('Toplam: $total', style: ZennTextStyles.caption),
+        const SizedBox(height: 14), 
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 2.2,
+          children: items.map((item) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: ZennColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: ZennColors.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: item.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(item.icon, size: 18, color: item.color),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item.value.toString(),
+                      style: const TextStyle(
+                        fontFamily: 'Inter', fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: ZennColors.textDark,
+                      ),
+                    ),
+                    Text(item.label, style: ZennTextStyles.caption),
+                  ],
+                ),
+              ],
+            ),
+          )).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatItem {
+  final String label;
+  final int value;
+  final IconData icon;
+  final Color color;
+  const _StatItem({required this.label, required this.value,
+      required this.icon, required this.color});
+}
+
+// ─── Settings Section ─────────────────────────────────────────────────────────
+
+class _SettingsSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Ayarlar', style: ZennTextStyles.headline3),
+        const SizedBox(height: 14),
+        Container(
+          decoration: BoxDecoration(
+            color: ZennColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ZennColors.border),
+          ),
+          child: Column(
+            children: [
+              _SettingsTile(
+                icon: Icons.notifications_outlined,
+                label: 'Bildirimler',
+                trailing: Switch(
+                  value: true,
+                  onChanged: (_) {},
+                  activeColor: ZennColors.primary,
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              _SettingsTile(
+                icon: Icons.dark_mode_outlined,
+                label: 'Karanlık Mod',
+                trailing: Switch(
+                  value: false,
+                  onChanged: (_) {},
+                  activeColor: ZennColors.primary,
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              _SettingsTile(
+                icon: Icons.vibration_rounded,
+                label: 'Titreşim',
+                trailing: Switch(
+                  value: true,
+                  onChanged: (_) {},
+                  activeColor: ZennColors.primary,
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              _SettingsTile(
+                icon: Icons.info_outlined,
+                label: 'Uygulama Hakkında',
+                trailing: const Icon(Icons.chevron_right_rounded,
+                    color: ZennColors.textHint),
+                onTap: () {},
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.label,
+    required this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color: ZennColors.cardLight,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 18, color: ZennColors.primary),
+      ),
+      title: Text(label, style: ZennTextStyles.bodyMedium.copyWith(
+          color: ZennColors.textDark)),
+      trailing: trailing,
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    );
+  }
+}
+
+// ─── Sign In Prompt ───────────────────────────────────────────────────────────
+
+class _SignInPrompt extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 60),
+      child: Column(
+        children: [
+          const Icon(Icons.account_circle_outlined,
+              size: 80, color: ZennColors.textHint),
+          const SizedBox(height: 16),
+          Text('Giriş Yapın', style: ZennTextStyles.headline2),
+          const SizedBox(height: 8),
+          Text(
+            'Elmas kazanmak ve istatistiklerinizi\ntakip etmek için giriş yapın.',
+            style: ZennTextStyles.body,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: ZennButton(
+              label: 'Google ile Giriş Yap',
+              leading: const Icon(Icons.g_mobiledata, color: Colors.white, size: 26),
+              onTap: () async {
+                try {
+                  await SupabaseService.instance.signInWithGoogle();
+                  if (!context.mounted) return;
+                  ref.invalidate(profileProvider);
+                  context.pop(); // profil ekranını kapat, ana sayfaya dön
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Giriş başarısız: $e')),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Large Diamond Painter ────────────────────────────────────────────────────
+
+class _LargeDiamondPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color  = Colors.white.withOpacity(0.2)
+      ..style  = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(size.width * .5, 0)
+      ..lineTo(size.width,       size.height * .4)
+      ..lineTo(size.width * .5,  size.height)
+      ..lineTo(0,                size.height * .4)
+      ..close();
+    canvas.drawPath(path, p);
+    final shine = Paint()
+      ..color = Colors.white.withOpacity(0.4)..style = PaintingStyle.fill;
+    final sp = Path()
+      ..moveTo(size.width * .5, 0)
+      ..lineTo(size.width * .75, size.height * .38)
+      ..lineTo(size.width * .5,  size.height * .22)
+      ..lineTo(size.width * .25, size.height * .38)
+      ..close();
+    canvas.drawPath(sp, shine);
+  }
+  @override bool shouldRepaint(_) => false;
+}

@@ -1,0 +1,64 @@
+name: zenn_sudoku
+description: ZeNN Sudoku – by Zenn App Studio
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Supabase & Auth
+  supabase_flutter: ^2.5.0
+  google_sign_in: ^6.2.1
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Navigation
+  go_router: ^13.2.0
+
+  # Storage & Preferences
+  shared_preferences: ^2.2.3
+
+  # UI Helpers
+  flutter_svg: ^2.0.10+1
+  lottie: ^3.1.0
+  shimmer: ^3.0.0
+  gap: ^3.0.1
+  intl: ^0.20.2
+
+  # Utils
+  uuid: ^4.4.0
+  collection: ^1.18.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.9
+  riverpod_generator: ^2.4.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+
+  # fonts:
+    #- family: Inter
+     # fonts:
+      #  - asset: assets/fonts/Inter-Regular.ttf
+       # - asset: assets/fonts/Inter-Medium.ttf
+        #  weight: 500
+      #  - asset: assets/fonts/Inter-SemiBold.ttf
+       #   weight: 600
+      #  - asset: assets/fonts/Inter-Bold.ttf
+       #   weight: 700
