@@ -1,5 +1,7 @@
 // lib/screens/game_screen.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/theme.dart';
@@ -15,16 +17,37 @@ class GameScreen extends ConsumerStatefulWidget {
   ConsumerState<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends ConsumerState<GameScreen> {
+class _GameScreenState extends ConsumerState<GameScreen>
+    with TickerProviderStateMixin {
+  // Hata yapıldığında mistake indicator'ı sallayan animasyon
+  late AnimationController _mistakeShakeCtrl;
+  late Animation<double> _mistakeShakeAnim;
 
   @override
   void initState() {
     super.initState();
+
+    _mistakeShakeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _mistakeShakeAnim =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_mistakeShakeCtrl);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Tamamlanma dinleyicisi
-      ref.listenManual(gameProvider, (_, next) {
+      // Tamamlanma + hata dinleyicisi
+      ref.listenManual(gameProvider, (prev, next) {
         if (next?.isComplete == true) _onComplete();
+
+        // Yeni hata yapıldıysa salla + titreşim
+        if (prev != null &&
+            next != null &&
+            next.mistakeCount > prev.mistakeCount) {
+          _mistakeShakeCtrl.forward(from: 0);
+          HapticFeedback.mediumImpact();
+        }
       });
+
       // Ekrana girilince timer başlat
       final state = ref.read(gameProvider);
       if (state != null && state.isPaused) {
@@ -35,6 +58,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
   @override
   void dispose() {
+    _mistakeShakeCtrl.dispose();
     final state = ref.read(gameProvider);
     if (state != null && !state.isPaused && !state.isComplete) {
       ref.read(gameProvider.notifier).togglePause();
@@ -42,44 +66,45 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     super.dispose();
   }
 
-void _onComplete() async {
-  await ref.read(gameProvider.notifier).saveCompletion();
-  ref.invalidate(profileProvider);
-  ref.invalidate(completionStatsProvider);  // bu satırı ekle
-  if (!mounted) return;
-  _showCompleteDialog();
-}
+  void _onComplete() async {
+    HapticFeedback.heavyImpact();
+    await ref.read(gameProvider.notifier).saveCompletion();
+    ref.invalidate(profileProvider);
+    ref.invalidate(completionStatsProvider);
+    if (!mounted) return;
+    _showCompleteDialog();
+  }
 
   void _showCompleteDialog() {
-  final state = ref.read(gameProvider);
-  if (state == null) return;
-  final isDaily  = state.puzzle.dailyId != null;
-  final diamonds = isDaily
-      ? AppConstants.diamondsDaily
-      : state.puzzle.difficulty.diamonds;
+    final state = ref.read(gameProvider);
+    if (state == null) return;
+    final isDaily = state.puzzle.dailyId != null;
+    final diamonds = isDaily
+        ? AppConstants.diamondsDaily
+        : state.puzzle.difficulty.diamonds;
 
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: _CompleteModal(
-        diamonds: diamonds,
-        time: state.elapsedFormatted,
-        mistakes: state.mistakeCount,
-        difficulty: state.puzzle.difficulty,
-        onContinue: () {
-          Navigator.pop(context);
-          context.pop();
-        },
-        onPlayAgain: () {
-          Navigator.pop(context);
-          context.pop();
-        },
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: _CompleteModal(
+          diamonds: diamonds,
+          time: state.elapsedFormatted,
+          mistakes: state.mistakeCount,
+          difficulty: state.puzzle.difficulty,
+          onContinue: () {
+            Navigator.pop(context);
+            context.pop();
+          },
+          onPlayAgain: () {
+            Navigator.pop(context);
+            context.pop();
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,13 +121,14 @@ void _onComplete() async {
           child: Column(
             children: [
               const SizedBox(height: 12),
-              // ── Top Bar ───────────────────────────────────────────
+              // ── Üst bar ──────────────────────────────────────────────────
               _TopBar(state: state),
               const SizedBox(height: 16),
-              // ── Timer + Mistakes + Diamond ─────────────────────
-              _StatsRow(state: state),
+              // ── İstatistik satırı (süre + hatalar + elmas) ───────────────
+              _StatsRow(
+                  state: state, mistakeShakeAnim: _mistakeShakeAnim),
               const SizedBox(height: 20),
-              // ── Board ─────────────────────────────────────────────
+              // ── Sudoku grid (duraklatılınca üstü kapanır) ────────────────
               Stack(
                 children: [
                   const SudokuGrid(),
@@ -145,10 +171,8 @@ void _onComplete() async {
                     ),
                 ],
               ),
-              
-
-              const SizedBox(height: 24),
-              // ── Numpad ────────────────────────────────────────────
+              const SizedBox(height: 20),
+              // ── Numpad ────────────────────────────────────────────────────
               const NumberPad(),
               const SizedBox(height: 16),
             ],
@@ -159,7 +183,7 @@ void _onComplete() async {
   }
 }
 
-// ─── Top Bar ─────────────────────────────────────────────────────────────────
+// ─── Üst Bar ─────────────────────────────────────────────────────────────────
 
 class _TopBar extends ConsumerWidget {
   final GameState state;
@@ -172,7 +196,8 @@ class _TopBar extends ConsumerWidget {
         GestureDetector(
           onTap: () => context.pop(),
           child: Container(
-            width: 40, height: 40,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: ZennColors.surfaceAlt,
               borderRadius: BorderRadius.circular(12),
@@ -183,30 +208,32 @@ class _TopBar extends ConsumerWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                state.puzzle.dailyId != null
-                    ? 'Günün Sudokusu'
-                    : '${state.puzzle.difficulty.label} Sudoku',
-                style: ZennTextStyles.headline3,
-              ),
-            ],
+          child: Text(
+            state.puzzle.dailyId != null
+                ? 'Günün Sudokusu'
+                : '${state.puzzle.difficulty.label} Sudoku',
+            style: ZennTextStyles.headline3,
           ),
         ),
-        // Pause button
+        // Durdur / Devam et butonu
         GestureDetector(
-          onTap: () => ref.read(gameProvider.notifier).togglePause(),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref.read(gameProvider.notifier).togglePause();
+          },
           child: Container(
-            width: 40, height: 40,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: ZennColors.surfaceAlt,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-              size: 22, color: ZennColors.textDark,
+              state.isPaused
+                  ? Icons.play_arrow_rounded
+                  : Icons.pause_rounded,
+              size: 22,
+              color: ZennColors.textDark,
             ),
           ),
         ),
@@ -215,19 +242,22 @@ class _TopBar extends ConsumerWidget {
   }
 }
 
-// ─── Stats Row ────────────────────────────────────────────────────────────────
+// ─── İstatistik Satırı ────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
   final GameState state;
-  const _StatsRow({required this.state});
+  final Animation<double> mistakeShakeAnim;
+  const _StatsRow(
+      {required this.state, required this.mistakeShakeAnim});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Timer
+        // Süre
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: ZennColors.surface,
             borderRadius: BorderRadius.circular(10),
@@ -242,20 +272,32 @@ class _StatsRow extends StatelessWidget {
               Text(
                 state.elapsedFormatted,
                 style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 14,
-                  fontWeight: FontWeight.w600, color: ZennColors.textDark,
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: ZennColors.textDark,
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(width: 10),
-        // Mistakes
-        MistakeIndicator(mistakes: state.mistakeCount),
+        // Hata göstergesi — hata yapılınca sağa-sola sallanır
+        AnimatedBuilder(
+          animation: mistakeShakeAnim,
+          builder: (_, child) {
+            final offset =
+                math.sin(mistakeShakeAnim.value * math.pi * 5) * 5.0;
+            return Transform.translate(
+                offset: Offset(offset, 0), child: child);
+          },
+          child: _MistakeRow(mistakes: state.mistakeCount),
+        ),
         const Spacer(),
-        // Diamond reward
+        // Kazanılacak elmas
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: ZennColors.cardLight,
             borderRadius: BorderRadius.circular(10),
@@ -263,16 +305,17 @@ class _StatsRow extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CustomPaint(size: const Size(13, 13),
-                  painter: _GreenDiamond()),
+              CustomPaint(
+                  size: const Size(13, 13),
+                  painter: _GreenDiamondPainter()),
               const SizedBox(width: 5),
               Text(
-                '+${state.puzzle.dailyId != null
-                    ? AppConstants.diamondsDaily
-                    : state.puzzle.difficulty.diamonds}',
+                '+${state.puzzle.dailyId != null ? AppConstants.diamondsDaily : state.puzzle.difficulty.diamonds}',
                 style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 13,
-                  fontWeight: FontWeight.w700, color: ZennColors.primary,
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: ZennColors.primary,
                 ),
               ),
             ],
@@ -283,22 +326,69 @@ class _StatsRow extends StatelessWidget {
   }
 }
 
-class _GreenDiamond extends CustomPainter {
+// ─── Hata Satırı (animasyonlu ikonlar) ───────────────────────────────────────
+
+class _MistakeRow extends StatelessWidget {
+  final int mistakes;
+  const _MistakeRow({required this.mistakes});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(AppConstants.maxMistakes, (i) {
+        final active = i < mistakes;
+        return Padding(
+          padding: const EdgeInsets.only(right: 5),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: active ? 24 : 22,
+            height: active ? 24 : 22,
+            decoration: BoxDecoration(
+              color: active
+                  ? ZennColors.errorLight
+                  : Colors.transparent,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: active
+                    ? ZennColors.error
+                    : ZennColors.gridLine,
+                width: active ? 0 : 1.5,
+              ),
+            ),
+            child: Icon(
+              Icons.close_rounded,
+              size: active ? 14 : 13,
+              color: active
+                  ? ZennColors.error
+                  : ZennColors.gridLine,
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _GreenDiamondPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = ZennColors.primary..style = PaintingStyle.fill;
+    final p = Paint()
+      ..color = ZennColors.primary
+      ..style = PaintingStyle.fill;
     final path = Path()
       ..moveTo(size.width * .5, 0)
-      ..lineTo(size.width,       size.height * .4)
-      ..lineTo(size.width * .5,  size.height)
-      ..lineTo(0,                size.height * .4)
+      ..lineTo(size.width, size.height * .4)
+      ..lineTo(size.width * .5, size.height)
+      ..lineTo(0, size.height * .4)
       ..close();
     canvas.drawPath(path, p);
   }
-  @override bool shouldRepaint(_) => false;
+
+  @override
+  bool shouldRepaint(_) => false;
 }
 
-// ─── Complete Modal ───────────────────────────────────────────────────────────
+// ─── Tamamlama Modalı ─────────────────────────────────────────────────────────
 
 class _CompleteModal extends StatefulWidget {
   final int diamonds;
@@ -322,25 +412,70 @@ class _CompleteModal extends StatefulWidget {
 }
 
 class _CompleteModalState extends State<_CompleteModal>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
+    with TickerProviderStateMixin {
+  late AnimationController _entryCtrl;
+  late AnimationController _confettiCtrl;
+  late AnimationController _diamondCtrl;
+
   late Animation<double> _scale;
   late Animation<double> _fade;
+  late Animation<int> _diamondCount;
+
+  late List<_Particle> _particles;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+
+    // Konfeti partikülleri (sabit seed → tutarlı pattern)
+    final rng = math.Random(42);
+    const celebrationColors = [
+      ZennColors.primary,
+      ZennColors.primaryMid,
+      Color(0xFFFFD700),
+      Color(0xFFFF6B6B),
+      Color(0xFF4ECDC4),
+      Color(0xFFFFB347),
+      Color(0xFFB19CD9),
+    ];
+    _particles = List.generate(40, (_) => _Particle(
+      startX: rng.nextDouble() * 340,
+      startY: -(rng.nextDouble() * 80 + 10),
+      speedFactor: 0.25 + rng.nextDouble() * 0.5,
+      size: 5.0 + rng.nextDouble() * 8,
+      color: celebrationColors[rng.nextInt(celebrationColors.length)],
+      isCircle: rng.nextBool(),
+      oscFreq: 0.5 + rng.nextDouble() * 2.5,
+      oscPhase: rng.nextDouble() * math.pi * 2,
+      rotSpeed: 0.5 + rng.nextDouble() * 3,
+    ));
+
+    // Giriş animasyonu (scale + fade)
+    _entryCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 500));
-    _scale = Tween(begin: 0.8, end: 1.0).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
-    _fade = Tween(begin: 0.0, end: 1.0).animate(_ctrl);
-    _ctrl.forward();
+    _scale = Tween<double>(begin: 0.8, end: 1.0).animate(
+        CurvedAnimation(parent: _entryCtrl, curve: Curves.elasticOut));
+    _fade = Tween<double>(begin: 0.0, end: 1.0).animate(_entryCtrl);
+
+    // Konfeti (3.5s sonra durur)
+    _confettiCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 3500))
+      ..forward();
+
+    // Elmas sayım animasyonu (giriş bittikten sonra başlar)
+    _diamondCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200));
+    _diamondCount = IntTween(begin: 0, end: widget.diamonds).animate(
+        CurvedAnimation(parent: _diamondCtrl, curve: Curves.easeOut));
+
+    _entryCtrl.forward().then((_) => _diamondCtrl.forward());
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _entryCtrl.dispose();
+    _confettiCtrl.dispose();
+    _diamondCtrl.dispose();
     super.dispose();
   }
 
@@ -348,68 +483,98 @@ class _CompleteModalState extends State<_CompleteModal>
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fade,
-      child: Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: ScaleTransition(
-          scale: _scale,
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
               children: [
-                // Trophy
-                Container(
-                  width: 90, height: 90,
-                  decoration: BoxDecoration(
-                    color: ZennColors.cardGreen,
-                    shape: BoxShape.circle,
+                // ── Konfeti katmanı ──────────────────────────────────────
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: _confettiCtrl,
+                    builder: (_, __) => CustomPaint(
+                      painter: _ConfettiPainter(
+                        progress: _confettiCtrl.value,
+                        particles: _particles,
+                      ),
+                    ),
                   ),
-                  child: const Icon(Icons.workspace_premium_rounded,
-                      size: 50, color: ZennColors.primary),
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Tebrikler! 🎉',
-                  style: ZennTextStyles.headline1,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sudokuyu tamamladın!',
-                  style: ZennTextStyles.body,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                // Stats
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: ZennColors.background,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                // ── Modal içeriği ────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _ResultStat(label: 'Süre', value: widget.time),
-                      _ResultStat(label: 'Hata', value: '${widget.mistakes}/3'),
-                      _ResultStat(
-                        label: 'Elmas',
-                        value: '+${widget.diamonds}',
-                        highlight: true,
+                      // Kupa ikonu
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: const BoxDecoration(
+                          color: ZennColors.cardGreen,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.workspace_premium_rounded,
+                            size: 50, color: ZennColors.primary),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Tebrikler! 🎉',
+                        style: ZennTextStyles.headline1,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sudokuyu tamamladın!',
+                        style: ZennTextStyles.body,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      // Sonuç satırı (süre | hata | elmas sayımı)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: ZennColors.background,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _ResultStat(
+                                label: 'Süre', value: widget.time),
+                            _ResultStat(
+                                label: 'Hata',
+                                value: '${widget.mistakes}/3'),
+                            // Elmas 0'dan kazanılan değere doğru sayar
+                            AnimatedBuilder(
+                              animation: _diamondCount,
+                              builder: (_, __) => _ResultStat(
+                                label: 'Elmas',
+                                value: '+${_diamondCount.value}',
+                                highlight: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ZennButton(
+                          label: 'Ana Sayfaya Dön',
+                          onTap: widget.onContinue),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: widget.onPlayAgain,
+                        child: const Text('Tekrar Oyna'),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
-                ZennButton(label: 'Ana Sayfaya Dön', onTap: widget.onContinue),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: widget.onPlayAgain,
-                  child: const Text('Tekrar Oyna'),
                 ),
               ],
             ),
@@ -420,12 +585,86 @@ class _CompleteModalState extends State<_CompleteModal>
   }
 }
 
+// ─── Konfeti Partikülü Modeli ─────────────────────────────────────────────────
+
+class _Particle {
+  final double startX;
+  final double startY;
+  final double speedFactor;
+  final double size;
+  final Color color;
+  final bool isCircle;
+  final double oscFreq;
+  final double oscPhase;
+  final double rotSpeed;
+
+  const _Particle({
+    required this.startX,
+    required this.startY,
+    required this.speedFactor,
+    required this.size,
+    required this.color,
+    required this.isCircle,
+    required this.oscFreq,
+    required this.oscPhase,
+    required this.rotSpeed,
+  });
+}
+
+// ─── Konfeti Painter ──────────────────────────────────────────────────────────
+
+class _ConfettiPainter extends CustomPainter {
+  final double progress;   // 0.0 → 1.0
+  final List<_Particle> particles;
+
+  const _ConfettiPainter(
+      {required this.progress, required this.particles});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final t = (progress * (1.0 + p.speedFactor)).clamp(0.0, 1.0);
+      final y = p.startY + t * size.height * 1.4;
+      if (y > size.height || y < -p.size) continue;
+
+      final x = p.startX +
+          math.sin(progress * math.pi * 2 * p.oscFreq + p.oscPhase) * 24;
+
+      final opacity = (1.0 - progress * 0.55).clamp(0.0, 1.0);
+      final paint = Paint()..color = p.color.withOpacity(opacity);
+
+      if (p.isCircle) {
+        canvas.drawCircle(Offset(x, y), p.size / 2, paint);
+      } else {
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.rotate(progress * math.pi * 2 * p.rotSpeed);
+        canvas.drawRect(
+          Rect.fromCenter(
+              center: Offset.zero,
+              width: p.size,
+              height: p.size * 0.6),
+          paint,
+        );
+        canvas.restore();
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter old) => old.progress != progress;
+}
+
+// ─── Sonuç İstatistiği ────────────────────────────────────────────────────────
+
 class _ResultStat extends StatelessWidget {
   final String label;
   final String value;
   final bool highlight;
-  const _ResultStat({
-      required this.label, required this.value, this.highlight = false});
+  const _ResultStat(
+      {required this.label,
+      required this.value,
+      this.highlight = false});
 
   @override
   Widget build(BuildContext context) {
@@ -434,8 +673,11 @@ class _ResultStat extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontFamily: 'Inter', fontSize: 20, fontWeight: FontWeight.w700,
-            color: highlight ? ZennColors.primary : ZennColors.textDark,
+            fontFamily: 'Inter',
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color:
+                highlight ? ZennColors.primary : ZennColors.textDark,
           ),
         ),
         const SizedBox(height: 2),

@@ -1,5 +1,6 @@
 // lib/widgets/sudoku_grid.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../providers/game_provider.dart';
@@ -34,10 +35,11 @@ class SudokuGrid extends ConsumerWidget {
               final cellSize = constraints.maxWidth / 9;
               return Stack(
                 children: [
-                  // Cells
+                  // Hücreler
                   GridView.builder(
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 9,
                     ),
                     itemCount: 81,
@@ -47,7 +49,7 @@ class SudokuGrid extends ConsumerWidget {
                       return _SudokuCell(row: r, col: c);
                     },
                   ),
-                  // Bold 3×3 box lines drawn on top
+                  // 3×3 kutu çizgileri (hücrelerin üstüne)
                   IgnorePointer(
                     child: CustomPaint(
                       size: Size.infinite,
@@ -64,29 +66,56 @@ class SudokuGrid extends ConsumerWidget {
   }
 }
 
-// ─── Single Cell ─────────────────────────────────────────────────────────────
+// ─── Tek Hücre ────────────────────────────────────────────────────────────────
 
-class _SudokuCell extends ConsumerWidget {
+class _SudokuCell extends ConsumerStatefulWidget {
   final int row;
   final int col;
   const _SudokuCell({required this.row, required this.col});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SudokuCell> createState() => _SudokuCellState();
+}
+
+class _SudokuCellState extends ConsumerState<_SudokuCell>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressCtrl;
+  late Animation<double> _pressScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 80));
+    _pressScale = Tween<double>(begin: 1.0, end: 0.88).animate(
+        CurvedAnimation(parent: _pressCtrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _pressCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(gameProvider);
     if (state == null) return const SizedBox.shrink();
 
     final board    = state.puzzle.board;
     final given    = state.puzzle.given;
     final solution = state.puzzle.solution;
-    final value    = board[row][col];
-    final isSelected  = state.selectedRow == row && state.selectedCol == col;
-    final isHighlight = state.highlights.contains((row, col));
-    final isConflict  = state.conflicts.contains((row, col));
-    final isRelated   = _isRelated(state.selectedRow, state.selectedCol, row, col);
-    final notes = state.notes[row][col];
+    final value    = board[widget.row][widget.col];
 
-    // Background color priority: selected > conflict > related > highlighted > default
+    final isSelected  = state.selectedRow == widget.row &&
+        state.selectedCol == widget.col;
+    final isHighlight = state.highlights.contains((widget.row, widget.col));
+    final isConflict  = state.conflicts.contains((widget.row, widget.col));
+    final isRelated   = _isRelated(
+        state.selectedRow, state.selectedCol, widget.row, widget.col);
+    final notes = state.notes[widget.row][widget.col];
+
+    // Arka plan rengi önceliği: conflict > selected > related > highlighted > default
     Color bg = ZennColors.surface;
     if (isConflict) {
       bg = ZennColors.errorLight;
@@ -98,48 +127,66 @@ class _SudokuCell extends ConsumerWidget {
       bg = const Color(0xFFE8F5EE);
     }
 
-    // Text color
+    // Metin rengi
     Color textColor;
     if (isConflict) {
       textColor = ZennColors.error;
-    } else if (!given[row][col] && value != 0) {
-      // Wrong answer?
-      textColor = value != solution[row][col]
+    } else if (!given[widget.row][widget.col] && value != 0) {
+      textColor = value != solution[widget.row][widget.col]
           ? ZennColors.error
           : ZennColors.entered;
     } else {
       textColor = ZennColors.given;
     }
 
-    // Cell border
     final borderSide = BorderSide(color: ZennColors.gridLine, width: 0.5);
 
     return GestureDetector(
-      onTap: () => ref.read(gameProvider.notifier).selectCell(row, col),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        decoration: BoxDecoration(
-          color: bg,
-          border: Border(
-            right:  borderSide,
-            bottom: borderSide,
+      onTapDown: (_) {
+        if (!given[widget.row][widget.col]) _pressCtrl.forward();
+      },
+      onTapUp: (_) {
+        _pressCtrl.reverse();
+        HapticFeedback.selectionClick();
+        ref.read(gameProvider.notifier).selectCell(widget.row, widget.col);
+      },
+      onTapCancel: () => _pressCtrl.reverse(),
+      child: AnimatedBuilder(
+        animation: _pressScale,
+        builder: (_, child) =>
+            Transform.scale(scale: _pressScale.value, child: child),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(
+              right: borderSide,
+              bottom: borderSide,
+              // Seçili hücreye ince yeşil sol kenar accent
+              left: isSelected
+                  ? const BorderSide(color: ZennColors.primary, width: 2)
+                  : BorderSide.none,
+              top: isSelected
+                  ? const BorderSide(color: ZennColors.primary, width: 2)
+                  : BorderSide.none,
+            ),
           ),
-        ),
-        child: value != 0
-            ? Center(
-                child: Text(
-                  value.toString(),
-                  style: ZennTextStyles.cellNumber.copyWith(
-                    color:      textColor,
-                    fontWeight: given[row][col]
-                        ? FontWeight.w700
-                        : FontWeight.w500,
+          child: value != 0
+              ? Center(
+                  child: Text(
+                    value.toString(),
+                    style: ZennTextStyles.cellNumber.copyWith(
+                      color: textColor,
+                      fontWeight: given[widget.row][widget.col]
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
                   ),
-                ),
-              )
-            : notes.isNotEmpty
-                ? _NotesGrid(notes: notes)
-                : const SizedBox.shrink(),
+                )
+              : notes.isNotEmpty
+                  ? _NotesGrid(notes: notes)
+                  : const SizedBox.shrink(),
+        ),
       ),
     );
   }
@@ -152,7 +199,7 @@ class _SudokuCell extends ConsumerWidget {
   }
 }
 
-// ─── Notes (pencil marks) ────────────────────────────────────────────────────
+// ─── Not Izgarası ────────────────────────────────────────────────────────────
 
 class _NotesGrid extends StatelessWidget {
   final Set<int> notes;
@@ -162,20 +209,24 @@ class _NotesGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(1),
+      padding: const EdgeInsets.all(1.5),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
       ),
       itemCount: 9,
       itemBuilder: (_, i) {
         final n = i + 1;
+        final active = notes.contains(n);
         return Center(
           child: Text(
-            notes.contains(n) ? n.toString() : '',
-            style: const TextStyle(
-              fontSize: 7,
-              color: ZennColors.textSoft,
-              fontWeight: FontWeight.w500,
+            active ? n.toString() : '',
+            style: TextStyle(
+              fontSize: 8,
+              // Aktif not: primary rengi, pasif: boş
+              color: active
+                  ? ZennColors.primary.withOpacity(0.75)
+                  : Colors.transparent,
+              fontWeight: FontWeight.w600,
             ),
           ),
         );
@@ -184,7 +235,7 @@ class _NotesGrid extends StatelessWidget {
   }
 }
 
-// ─── 3×3 box line painter ─────────────────────────────────────────────────────
+// ─── 3×3 Kutu Çizgi Painter ──────────────────────────────────────────────────
 
 class _BoxLinePainter extends CustomPainter {
   final double cellSize;
@@ -196,12 +247,12 @@ class _BoxLinePainter extends CustomPainter {
       ..color = ZennColors.gridBold
       ..strokeWidth = 2;
 
-    // Draw 2 inner vertical lines (at col 3 and col 6)
+    // Sütun 3 ve 6'da dikey çizgi
     for (int i = 1; i < 3; i++) {
       final x = cellSize * 3 * i;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
-    // Draw 2 inner horizontal lines (at row 3 and row 6)
+    // Satır 3 ve 6'da yatay çizgi
     for (int i = 1; i < 3; i++) {
       final y = cellSize * 3 * i;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);

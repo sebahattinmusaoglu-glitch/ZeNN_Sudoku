@@ -1,5 +1,6 @@
 // lib/widgets/number_pad.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../providers/game_provider.dart';
@@ -14,49 +15,104 @@ class NumberPad extends ConsumerWidget {
 
     return Column(
       children: [
-        // Action row: Undo | Erase | Notes
+        // ── Aksiyon butonları: Geri Al | Sil | Not ──────────────────────
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _ActionButton(
               icon: Icons.undo_rounded,
               label: 'Geri Al',
-              onTap: () => ref.read(gameProvider.notifier).undo(),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                ref.read(gameProvider.notifier).undo();
+              },
             ),
             _ActionButton(
               icon: Icons.backspace_outlined,
               label: 'Sil',
-              onTap: () => ref.read(gameProvider.notifier).erase(),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                ref.read(gameProvider.notifier).erase();
+              },
             ),
             _ActionButton(
               icon: Icons.edit_outlined,
               label: 'Not',
               active: state.isNoteMode,
-              onTap: () => ref.read(gameProvider.notifier).toggleNoteMode(),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                ref.read(gameProvider.notifier).toggleNoteMode();
+              },
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        // Number buttons 1–9
+
+        const SizedBox(height: 10),
+
+        // ── Not modu aktif banner'ı (AnimatedSize ile kayar açılır) ─────
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          child: state.isNoteMode
+              ? Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: ZennColors.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: ZennColors.primary.withOpacity(0.22),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit_outlined,
+                          size: 13, color: ZennColors.primary),
+                      SizedBox(width: 6),
+                      Text(
+                        'NOT MODU AKTİF — Sayı seç, hücreye not ekle',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: ZennColors.primary,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+
+        // ── Sayı butonları 1–9 ───────────────────────────────────────────
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: List.generate(9, (i) {
             final n = i + 1;
-            // Count how many of this number are on the board
             final board = state.puzzle.board;
-            int count = 0;
+            var usedCount = 0;
             for (final row in board) {
               for (final v in row) {
-                if (v == n) count++;
+                if (v == n) usedCount++;
               }
             }
-            final done = count >= 9;
+            final done = usedCount >= 9;
+            final remaining = 9 - usedCount;
+
             return _NumberButton(
               number: n,
               done: done,
+              remaining: remaining,
+              isNoteMode: state.isNoteMode,
               onTap: done
                   ? null
-                  : () => ref.read(gameProvider.notifier).inputNumber(n),
+                  : () {
+                      HapticFeedback.lightImpact();
+                      ref.read(gameProvider.notifier).inputNumber(n);
+                    },
             );
           }),
         ),
@@ -65,37 +121,108 @@ class NumberPad extends ConsumerWidget {
   }
 }
 
-// ─── Number Button ────────────────────────────────────────────────────────────
+// ─── Sayı Butonu ─────────────────────────────────────────────────────────────
 
-class _NumberButton extends StatelessWidget {
+class _NumberButton extends StatefulWidget {
   final int number;
   final bool done;
+  final int remaining;
+  final bool isNoteMode;
   final VoidCallback? onTap;
 
   const _NumberButton({
     required this.number,
     required this.done,
+    required this.remaining,
+    required this.isNoteMode,
     this.onTap,
   });
 
   @override
+  State<_NumberButton> createState() => _NumberButtonState();
+}
+
+class _NumberButtonState extends State<_NumberButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 80));
+    _scale = Tween<double>(begin: 1.0, end: 0.87).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: 36,
-        height: 52,
-        decoration: BoxDecoration(
-          color: done ? ZennColors.surfaceAlt : ZennColors.cardLight,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Center(
-          child: Text(
-            number.toString(),
-            style: ZennTextStyles.numpadNumber.copyWith(
-              color: done ? ZennColors.textHint : ZennColors.textDark,
-            ),
+      onTapDown: (_) {
+        if (widget.onTap != null) _ctrl.forward();
+      },
+      onTapUp: (_) {
+        _ctrl.reverse();
+        widget.onTap?.call();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: AnimatedBuilder(
+        animation: _scale,
+        builder: (_, child) =>
+            Transform.scale(scale: _scale.value, child: child),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 34,
+          height: 60,
+          decoration: BoxDecoration(
+            color: widget.done
+                ? ZennColors.surfaceAlt
+                : widget.isNoteMode
+                    ? ZennColors.primary.withOpacity(0.1)
+                    : ZennColors.cardLight,
+            borderRadius: BorderRadius.circular(12),
+            border: !widget.done && widget.isNoteMode
+                ? Border.all(
+                    color: ZennColors.primary.withOpacity(0.3),
+                  )
+                : null,
+            boxShadow: widget.done
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                widget.number.toString(),
+                style: ZennTextStyles.numpadNumber.copyWith(
+                  fontSize: 22,
+                  color: widget.done
+                      ? ZennColors.textHint
+                      : widget.isNoteMode
+                          ? ZennColors.primary
+                          : ZennColors.textDark,
+                ),
+              ),
+              // Kalan kullanım sayısı: ≤5 → nokta, >5 → rakam
+              if (!widget.done) ...[
+                const SizedBox(height: 4),
+                _RemainingDots(remaining: widget.remaining),
+              ],
+            ],
           ),
         ),
       ),
@@ -103,9 +230,48 @@ class _NumberButton extends StatelessWidget {
   }
 }
 
-// ─── Action Button ────────────────────────────────────────────────────────────
+// ─── Kalan Nokta Göstergesi ───────────────────────────────────────────────────
 
-class _ActionButton extends StatelessWidget {
+class _RemainingDots extends StatelessWidget {
+  final int remaining;
+  const _RemainingDots({required this.remaining});
+
+  @override
+  Widget build(BuildContext context) {
+    // 6+ kalan varsa sayı göster, 5 ve altı nokta
+    if (remaining > 5) {
+      return Text(
+        remaining.toString(),
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          color: ZennColors.textHint,
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(
+        remaining,
+        (_) => Container(
+          width: 3,
+          height: 3,
+          margin: const EdgeInsets.symmetric(horizontal: 1),
+          decoration: const BoxDecoration(
+            color: ZennColors.textHint,
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Aksiyon Butonu ───────────────────────────────────────────────────────────
+
+class _ActionButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -119,29 +285,81 @@ class _ActionButton extends StatelessWidget {
   });
 
   @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 80));
+    _scale = Tween<double>(begin: 1.0, end: 0.90).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: active ? ZennColors.primary : ZennColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) {
+        _ctrl.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: AnimatedBuilder(
+        animation: _scale,
+        builder: (_, child) =>
+            Transform.scale(scale: _scale.value, child: child),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color:
+                    widget.active ? ZennColors.primary : ZennColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: widget.active
+                    ? [
+                        BoxShadow(
+                          color: ZennColors.primary.withOpacity(0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Icon(
+                widget.icon,
+                size: 24,
+                color: widget.active ? Colors.white : ZennColors.textMid,
+              ),
             ),
-            child: Icon(
-              icon,
-              size: 22,
-              color: active ? Colors.white : ZennColors.textMid,
+            const SizedBox(height: 5),
+            Text(
+              widget.label,
+              style: ZennTextStyles.caption.copyWith(
+                color:
+                    widget.active ? ZennColors.primary : ZennColors.textSoft,
+                fontWeight:
+                    widget.active ? FontWeight.w600 : FontWeight.w400,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: ZennTextStyles.caption),
-        ],
+          ],
+        ),
       ),
     );
   }
