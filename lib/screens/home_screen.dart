@@ -205,37 +205,6 @@ class _DailyBanner extends ConsumerWidget {
   }
 }
 
-class _DiamondWhite extends StatelessWidget {
-  const _DiamondWhite();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(14, 14),
-      painter: _WhiteDiamondPainter(),
-    );
-  }
-}
-
-class _WhiteDiamondPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    final path = Path()
-      ..moveTo(size.width * .5, 0)
-      ..lineTo(size.width, size.height * .4)
-      ..lineTo(size.width * .5, size.height)
-      ..lineTo(0, size.height * .4)
-      ..close();
-    canvas.drawPath(path, p);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
-
 // ─── Zorluk Grid ─────────────────────────────────────────────────────────────
 
 class _DifficultyGrid extends ConsumerWidget {
@@ -484,26 +453,6 @@ class _LevelBar extends StatelessWidget {
       },
     );
   }
-}
-
-class _SmallDiamondPainter extends CustomPainter {
-  final Color color;
-  const _SmallDiamondPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = color..style = PaintingStyle.fill;
-    final path = Path()
-      ..moveTo(size.width * .5, 0)
-      ..lineTo(size.width, size.height * .4)
-      ..lineTo(size.width * .5, size.height)
-      ..lineTo(0, size.height * .4)
-      ..close();
-    canvas.drawPath(path, p);
-  }
-
-  @override
-  bool shouldRepaint(_SmallDiamondPainter old) => old.color != color;
 }
 
 // ─── İstatistik Bölümü ────────────────────────────────────────────────────────
