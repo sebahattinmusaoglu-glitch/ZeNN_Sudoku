@@ -22,7 +22,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000));
     _scale = Tween(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
     );
@@ -52,17 +52,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       backgroundColor: ZennColors.background,
       body: Stack(
         children: [
-          // Ambient blobs
-          Positioned(
-            left: -39, top: -88,
-            child: Container(
-              width: 234, height: 530,
-              decoration: BoxDecoration(
-                color: const Color(0xFFB1EFD8).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(117),
-              ),
-            ),
-          ),
+
           Positioned(
             right: 0, bottom: 80,
             child: Container(
@@ -89,8 +79,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
+                            color: ZennColors.primary.withOpacity(0.2), //
                             blurRadius: 32,
-                            offset: const Offset(0, 12),
+                            offset: const Offset(0, 12), //
                           ),
                         ],
                       ),
