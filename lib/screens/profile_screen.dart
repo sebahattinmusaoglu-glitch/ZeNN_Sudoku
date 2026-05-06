@@ -262,7 +262,7 @@ class _DiamondCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Toplam Elmas',
+                  'Toplam Kazandığın',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 13,
@@ -272,7 +272,7 @@ class _DiamondCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  diamonds.toString(),
+                  '${diamonds.toString()} Elmas',
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 36,
@@ -283,10 +283,7 @@ class _DiamondCard extends StatelessWidget {
               ],
             ),
           ),
-          CustomPaint(
-            size: const Size(60, 60),
-            painter: _LargeDiamondPainter(),
-          ),
+          const Text('💎', style: TextStyle(fontSize: 36)),
         ],
       ),
     );

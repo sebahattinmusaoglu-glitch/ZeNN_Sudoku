@@ -305,9 +305,7 @@ class _StatsRow extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CustomPaint(
-                  size: const Size(13, 13),
-                  painter: _GreenDiamondPainter()),
+              const Text('💎', style: TextStyle(fontSize: 13)), // kazanılacak elmas ikonu
               const SizedBox(width: 5),
               Text(
                 '+${state.puzzle.dailyId != null ? AppConstants.diamondsDaily : state.puzzle.difficulty.diamonds}',
@@ -367,25 +365,6 @@ class _MistakeRow extends StatelessWidget {
       }),
     );
   }
-}
-
-class _GreenDiamondPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = ZennColors.primary
-      ..style = PaintingStyle.fill;
-    final path = Path()
-      ..moveTo(size.width * .5, 0)
-      ..lineTo(size.width, size.height * .4)
-      ..lineTo(size.width * .5, size.height)
-      ..lineTo(0, size.height * .4)
-      ..close();
-    canvas.drawPath(path, p);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
 }
 
 // ─── Tamamlama Modalı ─────────────────────────────────────────────────────────

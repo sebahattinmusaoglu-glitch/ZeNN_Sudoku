@@ -84,7 +84,7 @@ class MistakeIndicator extends StatelessWidget {
           padding: const EdgeInsets.only(right: 4),
           child: Icon(
             Icons.close_rounded,
-            size: 18,
+            size: 18, 
             color: active ? ZennColors.error : ZennColors.gridLine,
           ),
         );

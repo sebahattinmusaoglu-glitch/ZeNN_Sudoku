@@ -175,7 +175,7 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
                     today: now,
                   ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 60), //
           ],
         ),
       ),
@@ -527,6 +527,7 @@ class _MonthCalendar extends StatelessWidget {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
             gridDelegate:
                 const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
