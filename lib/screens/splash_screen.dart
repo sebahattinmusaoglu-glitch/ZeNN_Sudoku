@@ -89,7 +89,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
-                            color: ZennColors.primary.withOpacity(0.3),
                             blurRadius: 32,
                             offset: const Offset(0, 12),
                           ),
