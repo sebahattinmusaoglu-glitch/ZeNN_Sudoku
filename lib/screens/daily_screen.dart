@@ -103,7 +103,7 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
             const SizedBox(height: 16),
 
             // ── Seri + Açıklama ──────────────────────────────────────
-            _StreakHero(streak: _currentStreak),
+            _StreakHero(streak: _currentStreak, loading: _loadingCalendar),
            //_StreakHero(streak: 30),
 
             const SizedBox(height: 16),
@@ -187,10 +187,53 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
 
 class _StreakHero extends StatelessWidget {
   final int streak;
-  const _StreakHero({required this.streak});
+  final bool loading;
+  const _StreakHero({required this.streak, required this.loading});
 
   @override
-  Widget build(BuildContext context) {
+    Widget build(BuildContext context) {
+
+    // Yükleniyorsa skeleton göster
+    if (loading) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+        decoration: BoxDecoration(
+          color: ZennColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: ZennColors.border),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(width: 72, height: 72),
+            SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 120,
+                  height: 16,
+                  child: LinearProgressIndicator(
+                    backgroundColor: ZennColors.border,
+                    valueColor: AlwaysStoppedAnimation(ZennColors.primary),
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Veriler güncelleniyor...',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: ZennColors.textHint,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     final hasStreak = streak > 0;
 
     return Container(
