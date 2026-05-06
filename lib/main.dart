@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'core/constants.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
@@ -31,12 +32,15 @@ Future<void> main() async {
 
   // Initialize Supabase
   await Supabase.initialize(
-    url:    AppConstants.supabaseUrl,
+    url:     AppConstants.supabaseUrl,
     anonKey: AppConstants.supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
     ),
   );
+
+  // Initialize AdMob
+  await MobileAds.instance.initialize();
 
   runApp(
     const ProviderScope(
