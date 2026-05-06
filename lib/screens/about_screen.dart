@@ -161,8 +161,8 @@ class _AppHeader extends StatelessWidget {
       children: [
         SvgPicture.asset(
           'assets/icons/logo.svg',
-          width: 160,
-          height: 160,
+          width: 120,
+          height: 120,
         ),
         const SizedBox(height: 12),
         const Text(

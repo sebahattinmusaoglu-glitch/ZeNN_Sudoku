@@ -12,7 +12,6 @@ import '../services/sudoku_generator.dart';
 import '../widgets/common_widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 class DailyScreen extends ConsumerStatefulWidget {
   const DailyScreen({super.key});
   @override
@@ -22,7 +21,8 @@ class DailyScreen extends ConsumerStatefulWidget {
 class _DailyScreenState extends ConsumerState<DailyScreen> {
   Set<String> _completedDates = {};
   bool _loadingCalendar = true;
-  int _totalPuzzleDays = 0;
+  int _totalPuzzleDays  = 0;
+  int _currentStreak    = 0;
 
   @override
   void initState() {
@@ -34,18 +34,45 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
     final now = DateTime.now();
     final completed = await SupabaseService.instance
         .getMonthlyCompletions(now.year, now.month);
-    
-    // Kaç günlük puzzle eklenmiş
     final totalPuzzles = await SupabaseService.instance
         .getMonthlyPuzzleCount(now.year, now.month);
-    
+
+  // Geçici debug
+  debugPrint('Completed dates: $completed');
+  debugPrint('Today key: ${now.year.toString().padLeft(4,'0')}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}');
+
+
     if (mounted) {
       setState(() {
         _completedDates  = completed;
         _totalPuzzleDays = totalPuzzles;
+        _currentStreak   = _calcStreak(completed, now);
         _loadingCalendar = false;
       });
     }
+  }
+
+  /// Bugünden geriye doğru ardışık tamamlanan gün sayısını hesaplar.
+  int _calcStreak(Set<String> completed, DateTime now) {
+    int streak = 0;
+    final todayKey = '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+
+    // Bugün tamamlandıysa bugünden, tamamlanmadıysa dünden başla
+    DateTime cursor = completed.contains(todayKey)
+        ? now
+        : now.subtract(const Duration(days: 1));
+
+    while (true) {
+      final key = '${cursor.year.toString().padLeft(4, '0')}-'
+          '${cursor.month.toString().padLeft(2, '0')}-'
+          '${cursor.day.toString().padLeft(2, '0')}';
+      if (!completed.contains(key)) break;
+      streak++;
+      cursor = cursor.subtract(const Duration(days: 1));
+    }
+    return streak;
   }
 
   @override
@@ -75,18 +102,24 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
           children: [
             const SizedBox(height: 16),
 
-            // ── Today's Puzzle Card ──────────────────────────────────
+            // ── Seri + Açıklama ──────────────────────────────────────
+            _StreakHero(streak: _currentStreak),
+           //_StreakHero(streak: 30),
+
+            const SizedBox(height: 16),
+
+            // ── Bugünü Oyna — kompakt aksiyon alanı ─────────────────
             daily.when(
               data: (puzzle) => puzzle != null
-                  ? _TodayCard(puzzle: puzzle)
+                  ? _CompactPlayCard(puzzle: puzzle)
                   : const _NoPuzzleCard(),
-              loading: () => const _PuzzleCardSkeleton(),
+              loading: () => const _PlayCardSkeleton(),
               error: (_, __) => const _NoPuzzleCard(),
             ),
 
             const SizedBox(height: 28),
 
-            // ── Monthly Calendar ─────────────────────────────────────
+            // ── Aylık Takvim başlığı ─────────────────────────────────
             Row(
               children: [
                 Text(
@@ -94,9 +127,9 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
                   style: ZennTextStyles.headline3,
                 ),
                 const Spacer(),
-                // Monthly bonus info
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: ZennColors.cardLight,
                     borderRadius: BorderRadius.circular(100),
@@ -110,8 +143,10 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
                       Text(
                         'Bonus: +${AppConstants.diamondsMonthly} 💎',
                         style: const TextStyle(
-                          fontFamily: 'Inter', fontSize: 11,
-                          fontWeight: FontWeight.w600, color: ZennColors.primary,
+                          fontFamily: 'Inter',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: ZennColors.primary,
                         ),
                       ),
                     ],
@@ -119,9 +154,10 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
                 ),
               ],
             ),
-        const SizedBox(height: 14),
 
-            // Monthly progress
+            const SizedBox(height: 14),
+
+            // ── Aylık İlerleme ───────────────────────────────────────
             _MonthlyProgress(
               completedCount: _completedDates.length,
               totalDays: _totalPuzzleDays,
@@ -129,6 +165,7 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
 
             const SizedBox(height: 16),
 
+            // ── Takvim ───────────────────────────────────────────────
             _loadingCalendar
                 ? const LinearProgressIndicator()
                 : _MonthCalendar(
@@ -146,157 +183,252 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
   }
 }
 
-// ─── Today's Puzzle Card ──────────────────────────────────────────────────────
+// ─── Seri Hero ────────────────────────────────────────────────────────────────
 
-class _TodayCard extends ConsumerWidget {
+class _StreakHero extends StatelessWidget {
+  final int streak;
+  const _StreakHero({required this.streak});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasStreak = streak > 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      decoration: BoxDecoration(
+        color: ZennColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: ZennColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Seri sayacı
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: hasStreak
+                  ? ZennColors.primary.withOpacity(0.08)
+                  : ZennColors.surfaceAlt,
+              shape: BoxShape.circle,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  hasStreak ? '🔥' : '💤',
+                  style: const TextStyle(fontSize: 26),
+                ),
+                Text(
+                  '$streak',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: hasStreak
+                        ? ZennColors.primary
+                        : ZennColors.textHint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 16),
+
+          // Açıklama
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasStreak
+                      ? '$streak günlük seri!'
+                      : 'Seriyi başlat!',
+                  style: ZennTextStyles.headline3.copyWith(
+                    color: hasStreak
+                        ? ZennColors.primary
+                        : ZennColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  hasStreak
+                      ? _streakMessage(streak)
+                      : 'Her gün bir bulmaca çözerek serine başla ve aylık bonusu kazan.',
+                  style: ZennTextStyles.caption.copyWith(height: 1.5),
+                ),
+                if (hasStreak) ...[
+                  const SizedBox(height: 10),
+                  _StreakMiniBar(streak: streak),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _streakMessage(int streak) {
+    if (streak >= 30) return 'Mükemmel! Tam ay boyunca hiç bırakmadın 🏆';
+    if (streak >= 14) return 'İnanılmaz! 2 haftadır her gün çözüyorsun 🌟';
+    if (streak >= 7)  return 'Harika! Bir haftadır kesintisiz devam ediyorsun ⚡';
+    if (streak >= 3)  return 'Güzel başlangıç! Devam edersen aylık bonusu kazanabilirsin.';
+    return 'Güzel! Seriyi korumaya devam et, her gün bir adım.';
+  }
+}
+
+// ─── Seri Mini Bar (son 7 günü görsel olarak gösterir) ────────────────────────
+
+class _StreakMiniBar extends StatelessWidget {
+  final int streak;
+  const _StreakMiniBar({required this.streak});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(7, (i) {
+        final filled = i < streak.clamp(0, 7);
+        return Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: 22,
+            height: 6,
+            decoration: BoxDecoration(
+              color: filled
+                  ? ZennColors.primary
+                  : ZennColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ─── Kompakt Oyun Kartı ───────────────────────────────────────────────────────
+
+class _CompactPlayCard extends ConsumerWidget {
   final DailyPuzzle puzzle;
-  const _TodayCard({required this.puzzle});
+  const _CompactPlayCard({required this.puzzle});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return FutureBuilder<List<bool>>(
+    return FutureBuilder<List<dynamic>>(
       future: Future.wait([
-      SupabaseService.instance.hasDailyCompleted(puzzle.id),
-      SharedPreferences.getInstance().then((p) => p.getString('saved_game_daily') != null),
-    ]),
-    builder: (context, snap) {
-        final isCompleted = snap.data?[0] ?? false;
-        final hasSavedGame = snap.data?[1] ?? false;
+        SupabaseService.instance.hasDailyCompleted(puzzle.id),
+        SharedPreferences.getInstance()
+            .then((p) => p.getString('saved_game_daily') != null),
+      ]),
+      builder: (context, snap) {
+        final isCompleted  = snap.data?[0] as bool? ?? false;
+        final hasSavedGame = snap.data?[1] as bool? ?? false;
 
         return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF005235), Color(0xFF1A6B4A)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
+            color: isCompleted
+                ? ZennColors.cardLight
+                : ZennColors.primary,
+            borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              // Header
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          DateFormat('d MMMM yyyy', 'tr').format(puzzle.date),
-                          style: const TextStyle(
-                            fontFamily: 'Inter', fontSize: 13,
-                            color: Colors.white70, fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Günün Sudokusu',
-                          style: TextStyle(
-                            fontFamily: 'Inter', fontSize: 22,
-                            fontWeight: FontWeight.w700, color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isCompleted)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_circle_outline_rounded,
-                              size: 14, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text('Tamamlandı',
-                              style: TextStyle(
-                                fontFamily: 'Inter', fontSize: 12,
-                                fontWeight: FontWeight.w500, color: Colors.white,
-                              )),
-                        ],
-                      ),
-                    ),
-                ],
+              // İkon
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? ZennColors.primary.withOpacity(0.1)
+                      : Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isCompleted
+                      ? Icons.check_circle_rounded
+                      : Icons.grid_on_rounded,
+                  color: isCompleted ? ZennColors.primary : Colors.white,
+                  size: 24,
+                ),
               ),
-              const SizedBox(height: 20),
-              // Reward row
-              Row(
-                children: [
-                  _RewardChip(
-                    icon: Icons.diamond_outlined,
-                    label: '+${AppConstants.diamondsDaily} Elmas',
-                  ),
-                  const SizedBox(width: 8),
-                  _RewardChip(
-                    icon: Icons.stars_rounded,
-                    label: 'Aylık Bonusa Katıl',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              if (!isCompleted)
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      final raw = prefs.getString('saved_game_daily');
-                      
-                      final p = SudokuPuzzle.fromStrings(
-                        puzzleStr:   puzzle.puzzle,
-                        solutionStr: puzzle.solution,
-                        difficulty:  Difficulty.hard,
-                        dailyId:     puzzle.id,
-                        date:        puzzle.date,
-                      );
 
-                      if (raw != null) {
-                        await ref.read(gameProvider.notifier).loadProgress(Difficulty.hard, isDaily: true);
-                      } else {
-                        ref.read(gameProvider.notifier).startGame(p);
-                      }
-                      
-                      if (!context.mounted) return;
-                      context.push(AppConstants.routeGame);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: ZennColors.primary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: Text(
-                      hasSavedGame ? 'Devam Et' : 'Şimdi Oyna',
-                      style: const TextStyle(
-                        fontFamily: 'Inter', fontSize: 16,
-                        fontWeight: FontWeight.w700,
+              const SizedBox(width: 14),
+
+              // Metin
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isCompleted ? 'Bugün tamamlandı' : 'Bugünün bulmacası',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color:
+                            isCompleted ? ZennColors.primary : Colors.white,
                       ),
                     ),
-                  ),
-                )
-              else
-                Container(
-                  width: double.infinity,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Bugün tamamlandı ✓',
+                    const SizedBox(height: 2),
+                    Text(
+                      isCompleted
+                          ? '+${AppConstants.diamondsDaily} elmas kazandın ✓'
+                          : hasSavedGame
+                              ? 'Kaldığın yerden devam et'
+                              : '+${AppConstants.diamondsDaily} elmas • Aylık bonusa katıl',
                       style: TextStyle(
-                        fontFamily: 'Inter', fontSize: 16,
-                        fontWeight: FontWeight.w600, color: Colors.white,
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        color: isCompleted
+                            ? ZennColors.primary.withOpacity(0.7)
+                            : Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Buton
+              if (!isCompleted)
+                GestureDetector(
+                  onTap: () async {
+                    final p = SudokuPuzzle.fromStrings(
+                      puzzleStr:   puzzle.puzzle,
+                      solutionStr: puzzle.solution,
+                      difficulty:  Difficulty.hard,
+                      dailyId:     puzzle.id,
+                      date:        puzzle.date,
+                    );
+                    if (hasSavedGame) {
+                      await ref
+                          .read(gameProvider.notifier)
+                          .loadProgress(Difficulty.hard, isDaily: true);
+                    } else {
+                      ref.read(gameProvider.notifier).startGame(p);
+                    }
+                    if (!context.mounted) return;
+                    context.push(AppConstants.routeGame);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      hasSavedGame ? 'Devam' : 'Oyna',
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: ZennColors.primary,
                       ),
                     ),
                   ),
@@ -309,62 +441,36 @@ class _TodayCard extends ConsumerWidget {
   }
 }
 
-class _RewardChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _RewardChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: Colors.white),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(
-            fontFamily: 'Inter', fontSize: 12,
-            fontWeight: FontWeight.w500, color: Colors.white,
-          )),
-        ],
-      ),
-    );
-  }
-}
-
 class _NoPuzzleCard extends StatelessWidget {
   const _NoPuzzleCard();
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: ZennColors.cardMedium,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: const Center(
-        child: Text('Bugün için bulmaca hazır değil. Yakında!',
-            textAlign: TextAlign.center,
-            style: ZennTextStyles.body),
+        child: Text(
+          'Bugün için bulmaca hazır değil. Yakında!',
+          textAlign: TextAlign.center,
+          style: ZennTextStyles.body,
+        ),
       ),
     );
   }
 }
 
-class _PuzzleCardSkeleton extends StatelessWidget {
-  const _PuzzleCardSkeleton();
+class _PlayCardSkeleton extends StatelessWidget {
+  const _PlayCardSkeleton();
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 200,
+      height: 72,
       decoration: BoxDecoration(
         color: ZennColors.cardMedium,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
     );
   }
@@ -392,8 +498,8 @@ class _MonthCalendar extends StatelessWidget {
       end:   DateTime(year, month + 1),
     ).duration.inDays;
 
-    final firstWeekday = DateTime(year, month, 1).weekday; // 1=Mon
-    final offset = firstWeekday - 1; // cells before day 1
+    final firstWeekday = DateTime(year, month, 1).weekday;
+    final offset = firstWeekday - 1;
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -404,23 +510,25 @@ class _MonthCalendar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Weekday headers
           Row(
-            children: ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'].map((d) =>
-              Expanded(
-                child: Center(
-                  child: Text(d, style: ZennTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ).toList(),
+            children: ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz']
+                .map((d) => Expanded(
+                      child: Center(
+                        child: Text(
+                          d,
+                          style: ZennTextStyles.caption
+                              .copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ))
+                .toList(),
           ),
           const SizedBox(height: 10),
-          // Day grid
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
               mainAxisSpacing: 4,
               crossAxisSpacing: 4,
@@ -429,18 +537,15 @@ class _MonthCalendar extends StatelessWidget {
             itemBuilder: (_, i) {
               if (i < offset) return const SizedBox.shrink();
               final day = i - offset + 1;
-              final dateStr = '${year.toString().padLeft(4,'0')}-'
-                  '${month.toString().padLeft(2,'0')}-'
-                  '${day.toString().padLeft(2,'0')}';
-              final isToday     = day == today.day;
-              final isCompleted = completedDates.contains(dateStr);
-              final isFuture    = day > today.day;
-
+              final dateStr =
+                  '${year.toString().padLeft(4, '0')}-'
+                  '${month.toString().padLeft(2, '0')}-'
+                  '${day.toString().padLeft(2, '0')}';
               return _CalendarDay(
                 day: day,
-                isToday: isToday,
-                isCompleted: isCompleted,
-                isFuture: isFuture,
+                isToday:     day == today.day,
+                isCompleted: completedDates.contains(dateStr),
+                isFuture:    day > today.day,
               );
             },
           ),
@@ -494,7 +599,9 @@ class _CalendarDay extends StatelessWidget {
         child: Text(
           day.toString(),
           style: TextStyle(
-            fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
             color: textColor,
           ),
         ),
@@ -515,7 +622,8 @@ class _MonthlyProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = totalDays > 0 ? completedCount / totalDays : 0.0;
+    final progress =
+        totalDays > 0 ? completedCount / totalDays : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -532,8 +640,8 @@ class _MonthlyProgress extends StatelessWidget {
               children: [
                 Text(
                   'Aylık İlerleme',
-                  style: ZennTextStyles.bodyMedium.copyWith(
-                      color: ZennColors.textDark),
+                  style: ZennTextStyles.bodyMedium
+                      .copyWith(color: ZennColors.textDark),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -547,7 +655,8 @@ class _MonthlyProgress extends StatelessWidget {
                     value: progress.clamp(0.0, 1.0),
                     minHeight: 8,
                     backgroundColor: ZennColors.border,
-                    valueColor: const AlwaysStoppedAnimation(ZennColors.primary),
+                    valueColor: const AlwaysStoppedAnimation(
+                        ZennColors.primary),
                   ),
                 ),
               ],
@@ -555,8 +664,9 @@ class _MonthlyProgress extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(
               color: ZennColors.cardLight,
               shape: BoxShape.circle,
             ),
@@ -564,8 +674,10 @@ class _MonthlyProgress extends StatelessWidget {
               child: Text(
                 '${(progress * 100).round()}%',
                 style: const TextStyle(
-                  fontFamily: 'Inter', fontSize: 13,
-                  fontWeight: FontWeight.w700, color: ZennColors.primary,
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: ZennColors.primary,
                 ),
               ),
             ),
@@ -575,5 +687,3 @@ class _MonthlyProgress extends StatelessWidget {
     );
   }
 }
-
-

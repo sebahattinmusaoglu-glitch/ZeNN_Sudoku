@@ -1,22 +1,18 @@
-<svg width="176" height="176" viewBox="0 0 176 176" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g filter="url(#filter0_d_66_914)">
-<rect x="40" y="36" width="96" height="96" rx="48" fill="white" shape-rendering="crispEdges"/>
-<rect x="40.5" y="36.5" width="95" height="95" rx="47.5" stroke="#ACB3B2" stroke-opacity="0.1" shape-rendering="crispEdges"/>
-<rect x="73.3655" y="61.4649" width="16.0004" height="16.0101" rx="2" transform="rotate(12 73.3655 61.4649)" fill="#2D6957" fill-opacity="0.8"/>
-<rect x="94.8848" y="66.0389" width="16.0004" height="16.0004" rx="2" transform="rotate(12 94.8848 66.0389)" fill="#B1EFD8"/>
-<rect x="68.7915" y="82.9841" width="16.0004" height="16.0004" rx="2" transform="rotate(12 68.7915 82.9841)" fill="#CEE9DD"/>
-<rect x="90.6958" y="88.1512" width="14.9983" height="15.0004" rx="1.5" transform="rotate(12 90.6958 88.1512)" stroke="#2D6957" stroke-opacity="0.2"/>
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#filter0_f_74_48)">
+<path d="M112 60C112 88.7188 88.7188 112 60 112C31.2812 112 8 88.7188 8 60C8 31.2812 31.2812 8 60 8C88.7188 8 112 31.2812 112 60Z" fill="black" fill-opacity="0.2"/>
 </g>
+<path d="M112 60C112 88.7188 88.7188 112 60 112C31.2812 112 8 88.7188 8 60C8 31.2812 31.2812 8 60 8C88.7188 8 112 31.2812 112 60Z" fill="white"/>
+<path d="M60 8.5C88.4427 8.5 111.5 31.5573 111.5 60C111.5 88.4427 88.4427 111.5 60 111.5C31.5573 111.5 8.5 88.4427 8.5 60C8.5 31.5573 31.5573 8.5 60 8.5Z" stroke="black" stroke-opacity="0.1"/>
+<path d="M37.7593 29.5927C38.0985 27.9967 39.6673 26.9779 41.2632 27.3171L58.6022 31.0027C60.1981 31.3419 61.2169 32.9108 60.8777 34.5068L57.1892 51.8602C56.8499 53.4562 55.2812 54.475 53.6852 54.1358L36.3462 50.4502C34.7503 50.1109 33.7315 48.5421 34.0707 46.9461L37.7593 29.5927Z" fill="#2D6957" fill-opacity="0.8"/>
+<path d="M69.5465 36.3494C69.8857 34.7534 71.4545 33.7346 73.0504 34.0739L90.3894 37.7595C91.9853 38.0987 93.0041 39.6675 92.6649 41.2635L88.9794 58.6028C88.6401 60.1988 87.0714 61.2176 85.4754 60.8784L68.1365 57.1928C66.5405 56.8536 65.5217 55.2848 65.8609 53.6888L69.5465 36.3494Z" fill="#B1EFD8"/>
+<path d="M31.0026 61.3806C31.3419 59.7846 32.9106 58.7658 34.5066 59.105L51.8456 62.7906C53.4415 63.1298 54.4603 64.6986 54.1211 66.2946L50.4356 83.634C50.0963 85.2299 48.5275 86.2488 46.9316 85.9095L29.5926 82.2239C27.9967 81.8847 26.9779 80.3159 27.3171 78.7199L31.0026 61.3806Z" fill="#CEE9DD"/>
+<path d="M79.0227 91.22L78.7156 92.6649L61.3799 88.98L61.6871 87.5351L79.0227 91.22ZM80.7747 90.0822L84.4601 72.7434C84.6297 71.9454 84.1203 71.161 83.3223 70.9914L65.9867 67.3065C65.1887 67.1369 64.4043 67.6463 64.2347 68.4443L60.5493 85.7831C60.3797 86.5811 60.8891 87.3655 61.6871 87.5351L61.3799 88.98C59.784 88.6408 58.7652 87.0719 59.1044 85.476L62.7898 68.1371C63.1291 66.5411 64.6978 65.5223 66.2938 65.8616L83.6294 69.5465C85.2254 69.8857 86.2442 71.4545 85.9049 73.0505L82.2195 90.3893C81.8803 91.9853 80.3115 93.0041 78.7156 92.6649L79.0227 91.22C79.8207 91.3896 80.605 90.8802 80.7747 90.0822Z" fill="#2D6957" fill-opacity="0.2"/>
 <defs>
-<filter id="filter0_d_66_914" x="0" y="0" width="176" height="176" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<filter id="filter0_f_74_48" x="3.5" y="3.5" width="113" height="113" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
 <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-<feOffset dy="4"/>
-<feGaussianBlur stdDeviation="20"/>
-<feComposite in2="hardAlpha" operator="out"/>
-<feColorMatrix type="matrix" values="0 0 0 0 0.176471 0 0 0 0 0.203922 0 0 0 0 0.2 0 0 0 0.06 0"/>
-<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_66_914"/>
-<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_66_914" result="shape"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="2.25" result="effect1_foregroundBlur_74_48"/>
 </filter>
 </defs>
 </svg>

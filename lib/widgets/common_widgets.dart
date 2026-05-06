@@ -46,7 +46,7 @@ class _DiamondChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _DiamondIcon(size: size),
+          Text('💎', style: TextStyle(fontSize: size * 0.85)),
           const SizedBox(width: 5),
           Text(
             count.toString(),
@@ -63,56 +63,6 @@ class _DiamondChip extends StatelessWidget {
   }
 }
 
-// ─── Diamond Icon ─────────────────────────────────────────────────────────────
-
-class _DiamondIcon extends StatelessWidget {
-  final double size;
-  const _DiamondIcon({required this.size});
-
-  @override
-  Widget build(BuildContext ctx) {
-    return CustomPaint(
-      size: Size(size, size),
-      painter: _DiamondPainter(),
-    );
-  }
-}
-
-class _DiamondPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color  = ZennColors.primary
-      ..style  = PaintingStyle.fill;
-
-    final w = size.width;
-    final h = size.height;
-
-    final path = Path()
-      ..moveTo(w * 0.5, 0)
-      ..lineTo(w,       h * 0.4)
-      ..lineTo(w * 0.5, h)
-      ..lineTo(0,       h * 0.4)
-      ..close();
-
-    canvas.drawPath(path, paint);
-
-    // Shine
-    final shine = Paint()
-      ..color = Colors.white.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-    final shinePath = Path()
-      ..moveTo(w * 0.5, 0)
-      ..lineTo(w * 0.75, h * 0.38)
-      ..lineTo(w * 0.5, h * 0.22)
-      ..lineTo(w * 0.25, h * 0.38)
-      ..close();
-    canvas.drawPath(shinePath, shine);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
 
 // ─── Mistake Indicator ───────────────────────────────────────────────────────
 
