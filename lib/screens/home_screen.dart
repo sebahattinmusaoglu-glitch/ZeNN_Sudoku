@@ -9,6 +9,7 @@ import '../providers/game_provider.dart';
 import '../widgets/common_widgets.dart';
 import '../services/sudoku_generator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/supabase_service.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -180,7 +181,9 @@ class _DailyBanner extends ConsumerWidget {
                       const _DiamondWhite(),
                       const SizedBox(width: 5),
                       Text(
-                        '+${AppConstants.diamondsDaily} elmas',
+                        SupabaseService.instance.isSignedIn
+                        ? '+${AppConstants.diamondsDaily} elmas'
+                        : 'Giriş yap, 10 Elmas kazan',
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 13,

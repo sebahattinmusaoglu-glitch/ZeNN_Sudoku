@@ -571,6 +571,7 @@ class _SignInPrompt extends ConsumerWidget {
                   await SupabaseService.instance.signInWithGoogle();
                   if (!context.mounted) return;
                   ref.invalidate(profileProvider);
+                  ref.invalidate(completionStatsProvider);
                   context.pop();
                 } catch (e) {
                   if (!context.mounted) return;
