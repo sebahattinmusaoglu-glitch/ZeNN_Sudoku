@@ -259,6 +259,38 @@ class GameNotifier extends StateNotifier<GameState?> {
     state = s.copyWith(notes: newNotes);
   }
 
+  Future<HintResult> useHint() async {
+    if (state == null) return HintResult.noCell;
+    final s = state!;
+    if (s.selectedRow == null || s.selectedCol == null) return HintResult.noCell;
+    final r = s.selectedRow!;
+    final c = s.selectedCol!;
+    if (s.puzzle.given[r][c]) return HintResult.noCell;
+    if (s.puzzle.board[r][c] == s.puzzle.solution[r][c]) return HintResult.noCell;
+
+    // Elmas kontrolü
+    final profile = await SupabaseService.instance.getProfile();
+    if (profile == null || profile.totalDiamonds < 1) return HintResult.noDiamond;
+
+    // Elması düş
+    await SupabaseService.instance.deductDiamond();
+
+    // Hücreyi doldur
+    final newBoard = s.puzzle.board.map((row) => List<int>.from(row)).toList();
+    newBoard[r][c] = s.puzzle.solution[r][c];
+    final newPuzzle = SudokuPuzzle(
+      board: newBoard, given: s.puzzle.given, solution: s.puzzle.solution,
+      difficulty: s.puzzle.difficulty, dailyId: s.puzzle.dailyId, date: s.puzzle.date,
+    );
+    state = s.copyWith(
+      puzzle: newPuzzle,
+      conflicts: {},
+      isComplete: newPuzzle.isSolved,
+    );
+    saveProgress();
+    return HintResult.success;
+  }
+
   void erase() {
     if (state == null) return;
     if (state!.selectedRow == null || state!.selectedCol == null) return;
@@ -288,6 +320,12 @@ class GameNotifier extends StateNotifier<GameState?> {
     );
   }
 }
+
+// ─── Hint Result ─────────────────────────────────────────────────────────────
+
+enum HintResult { success, noCell, noDiamond }
+
+// ─── Providers ───────────────────────────────────────────────────────────────
 
 final gameProvider = StateNotifierProvider<GameNotifier, GameState?>((ref) => GameNotifier());
 final profileProvider = FutureProvider((ref) async => SupabaseService.instance.getProfile());

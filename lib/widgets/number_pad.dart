@@ -14,43 +14,16 @@ class NumberPad extends ConsumerWidget {
     if (state == null) return const SizedBox.shrink();
     final hapticOn = ref.read(hapticEnabledProvider);
 
+    // Rakam kullanım sayıları
+    int usedCount(int n) {
+      var c = 0;
+      for (final row in state.puzzle.board) for (final v in row) if (v == n) c++;
+      return c;
+    }
+
     return Column(
       children: [
-        // ── Aksiyon butonları: Geri Al | Sil | Not ──────────────────────
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _ActionButton(
-              icon: Icons.undo_rounded,
-              label: 'Geri Al',
-              onTap: () {
-                if (hapticOn) HapticFeedback.lightImpact();
-                ref.read(gameProvider.notifier).undo();
-              },
-            ),
-            _ActionButton(
-              icon: Icons.backspace_outlined,
-              label: 'Sil',
-              onTap: () {
-                if (hapticOn) HapticFeedback.lightImpact();
-                ref.read(gameProvider.notifier).erase();
-              },
-            ),
-            _ActionButton(
-              icon: Icons.edit_outlined,
-              label: 'Not',
-              active: state.isNoteMode,
-              onTap: () {
-                if (hapticOn) HapticFeedback.lightImpact();
-                ref.read(gameProvider.notifier).toggleNoteMode();
-              },
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 10),
-
-        // ── Not modu aktif banner'ı (AnimatedSize ile kayar açılır) ─────
+        // ── Not modu banner ───────────────────────────────────────────────
         AnimatedSize(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeInOut,
@@ -63,8 +36,7 @@ class NumberPad extends ConsumerWidget {
                     color: ZennColors.primary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: ZennColors.primary.withOpacity(0.22),
-                    ),
+                        color: ZennColors.primary.withOpacity(0.22)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -88,39 +60,141 @@ class NumberPad extends ConsumerWidget {
               : const SizedBox.shrink(),
         ),
 
-        // ── Sayı butonları 1–9 ───────────────────────────────────────────
+        // ── Satır 1: 1-2-3-4-5 | Geri Al ────────────────────────────────
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(9, (i) {
-            final n = i + 1;
-            final board = state.puzzle.board;
-            var usedCount = 0;
-            for (final row in board) {
-              for (final v in row) {
-                if (v == n) usedCount++;
-              }
-            }
-            final done = usedCount >= 9;
-            final remaining = 9 - usedCount;
+          children: [
+            // 1–5
+            ...List.generate(5, (i) {
+              final n         = i + 1;
+              final used      = usedCount(n);
+              final done      = used >= 9;
+              final remaining = 9 - used;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 5),
+                  child: _NumberButton(
+                    number: n,
+                    done: done,
+                    remaining: remaining,
+                    isNoteMode: state.isNoteMode,
+                    onTap: done
+                        ? null
+                        : () {
+                            if (hapticOn) HapticFeedback.lightImpact();
+                            ref.read(gameProvider.notifier).inputNumber(n);
+                          },
+                  ),
+                ),
+              );
+            }),
+            // Geri Al
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.undo_rounded,
+                label: 'Geri Al',
+                onTap: () {
+                  if (hapticOn) HapticFeedback.lightImpact();
+                  ref.read(gameProvider.notifier).undo();
+                },
+              ),
+            ),
+          ],
+        ),
 
-            return _NumberButton(
-              number: n,
-              done: done,
-              remaining: remaining,
-              isNoteMode: state.isNoteMode,
-              onTap: done
-                  ? null
-                  : () {
-                      if (hapticOn) HapticFeedback.lightImpact();
-                      ref.read(gameProvider.notifier).inputNumber(n);
-                    },
-            );
-          }),
+        const SizedBox(height: 8),
+
+        // ── Satır 2: 6-7-8-9 | Sil | Not | İpucu ────────────────────────
+        Row(
+          children: [
+            // 6–9
+            ...List.generate(4, (i) {
+              final n         = i + 6;
+              final used      = usedCount(n);
+              final done      = used >= 9;
+              final remaining = 9 - used;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 5),
+                  child: _NumberButton(
+                    number: n,
+                    done: done,
+                    remaining: remaining,
+                    isNoteMode: state.isNoteMode,
+                    onTap: done
+                        ? null
+                        : () {
+                            if (hapticOn) HapticFeedback.lightImpact();
+                            ref.read(gameProvider.notifier).inputNumber(n);
+                          },
+                  ),
+                ),
+              );
+            }),
+            // Sil
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 5),
+                child: _ActionButton(
+                  icon: Icons.backspace_outlined,
+                  label: 'Sil',
+                  onTap: () {
+                    if (hapticOn) HapticFeedback.lightImpact();
+                    ref.read(gameProvider.notifier).erase();
+                  },
+                ),
+              ),
+            ),
+            // Not
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 5),
+                child: _ActionButton(
+                  icon: Icons.edit_outlined,
+                  label: 'Not',
+                  active: state.isNoteMode,
+                  onTap: () {
+                    if (hapticOn) HapticFeedback.lightImpact();
+                    ref.read(gameProvider.notifier).toggleNoteMode();
+                  },
+                ),
+              ),
+            ),
+            // İpucu
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.lightbulb_outline_rounded,
+                label: 'İpucu',
+                onTap: () async {
+                  if (hapticOn) HapticFeedback.lightImpact();
+                  final result =
+                      await ref.read(gameProvider.notifier).useHint();
+                  if (!context.mounted) return;
+                  switch (result) {
+                    case HintResult.success:
+                      ref.invalidate(profileProvider);
+                      HapticFeedback.mediumImpact();
+                      break;
+                    case HintResult.noCell:
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        _hintSnackBar('Önce bir hücre seç 👆'),
+                      );
+                      break;
+                    case HintResult.noDiamond:
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        _hintSnackBar('Yeterli elmas yok 💎'),
+                      );
+                      break;
+                  }
+                },
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 }
+
 
 // ─── Sayı Butonu ─────────────────────────────────────────────────────────────
 
@@ -180,8 +254,7 @@ class _NumberButtonState extends State<_NumberButton>
             Transform.scale(scale: _scale.value, child: child),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          width: 34,
-          height: 60,
+          height: 58,
           decoration: BoxDecoration(
             color: widget.done
                 ? ZennColors.surfaceAlt
@@ -327,36 +400,27 @@ class _ActionButtonState extends State<_ActionButton>
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 150),
-              width: 52,
-              height: 52,
+              height: 58,
               decoration: BoxDecoration(
-                color:
-                    widget.active ? ZennColors.primary : ZennColors.surfaceAlt,
-                borderRadius: BorderRadius.circular(14),
+                color: widget.active ? ZennColors.primary : ZennColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: widget.active
-                    ? [
-                        BoxShadow(
-                          color: ZennColors.primary.withOpacity(0.25),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
+                    ? [BoxShadow(
+                        color: ZennColors.primary.withOpacity(0.25),
+                        blurRadius: 8, offset: const Offset(0, 3))]
                     : null,
               ),
-              child: Icon(
-                widget.icon,
-                size: 24,
-                color: widget.active ? Colors.white : ZennColors.textMid,
-              ),
+              child: Icon(widget.icon, size: 22,
+                  color: widget.active ? Colors.white : ZennColors.textMid),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 4),
             Text(
               widget.label,
-              style: ZennTextStyles.caption.copyWith(
-                color:
-                    widget.active ? ZennColors.primary : ZennColors.textSoft,
-                fontWeight:
-                    widget.active ? FontWeight.w600 : FontWeight.w400,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 10,
+                fontWeight: widget.active ? FontWeight.w600 : FontWeight.w400,
+                color: widget.active ? ZennColors.primary : ZennColors.textSoft,
               ),
             ),
           ],
@@ -365,3 +429,12 @@ class _ActionButtonState extends State<_ActionButton>
     );
   }
 }
+
+SnackBar _hintSnackBar(String message) => SnackBar(
+  content: Text(message),
+  behavior: SnackBarBehavior.floating,
+  backgroundColor: ZennColors.primary,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  margin: const EdgeInsets.all(16),
+  duration: const Duration(seconds: 2),
+);

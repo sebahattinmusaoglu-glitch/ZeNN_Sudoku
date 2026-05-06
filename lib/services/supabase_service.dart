@@ -104,9 +104,19 @@ class SupabaseService {
 
     final isDaily     = dailyPuzzleId != null;
     final puzzleType  = isDaily ? 'daily' : difficulty.labelEn;
-    final diamonds    = isDaily
-        ? AppConstants.diamondsDaily
-        : difficulty.diamonds;
+    final diamonds   = isDaily ? AppConstants.diamondsDaily : difficulty.diamonds;
+
+    // ── Duplicate kontrolü ──────────────────────────────────────────────
+    // Daily: aynı puzzle zaten tamamlandıysa atla
+    if (isDaily) {
+      final existing = await _client
+          .from('completions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('daily_puzzle_id', dailyPuzzleId)
+          .maybeSingle();
+      if (existing != null) return;   // zaten tamamlanmış, işlemi durdur
+    }
 
     // Insert completion
     await _client.from('completions').insert({
@@ -206,6 +216,17 @@ class SupabaseService {
         .gte('date', '$year-${month.toString().padLeft(2,'0')}-01')
         .lte('date', '$year-${month.toString().padLeft(2,'0')}-31');
     return (data as List).length;
+  }
+
+    Future<void> deductDiamond() async {
+    final userId = currentUser?.id;
+    if (userId == null) return;
+    await _client.rpc('award_diamonds', params: {
+      'p_user_id':          userId,
+      'p_amount':           -1,
+      'p_transaction_type': 'hint_used',
+      'p_description':      'Hint used',
+    });
   }
 
 }

@@ -37,8 +37,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Tamamlanma + hata dinleyicisi
       ref.listenManual(gameProvider, (prev, next) {
-        if (next?.isComplete == true) _onComplete();
-
+        // Sadece false → true geçişinde tetikle, yüklemede tetikleme
+        if (prev?.isComplete == false && next?.isComplete == true) {
+          _onComplete();
+        }
         // Yeni hata yapıldıysa salla + titreşim
         if (prev != null &&
             next != null &&
@@ -132,11 +134,12 @@ class _GameScreenState extends ConsumerState<GameScreen>
               Stack(
                 children: [
                   const SudokuGrid(),
-                  if (state.isPaused)
+                  // ── Duraklatma overlay ───────────────────────────
+                  if (state.isPaused && !state.isComplete)
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: ZennColors.primary.withOpacity(1),
+                          color: ZennColors.primary,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Center(
@@ -167,6 +170,16 @@ class _GameScreenState extends ConsumerState<GameScreen>
                             ],
                           ),
                         ),
+                      ),
+                    ),
+                  // ── Tamamlama overlay ────────────────────────────
+                  if (state.isComplete)
+                    Positioned.fill(
+                      child: _CompletedOverlay(
+                        diamonds: state.puzzle.dailyId != null
+                            ? AppConstants.diamondsDaily
+                            : state.puzzle.difficulty.diamonds,
+                        onNewGame: () => context.pop(),
                       ),
                     ),
                 ],
@@ -305,7 +318,9 @@ class _StatsRow extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('💎', style: TextStyle(fontSize: 13)), // kazanılacak elmas ikonu
+              CustomPaint(
+                  size: const Size(13, 13),
+                  painter: _GreenDiamondPainter()),
               const SizedBox(width: 5),
               Text(
                 '+${state.puzzle.dailyId != null ? AppConstants.diamondsDaily : state.puzzle.difficulty.diamonds}',
@@ -365,6 +380,25 @@ class _MistakeRow extends StatelessWidget {
       }),
     );
   }
+}
+
+class _GreenDiamondPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = ZennColors.primary
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(size.width * .5, 0)
+      ..lineTo(size.width, size.height * .4)
+      ..lineTo(size.width * .5, size.height)
+      ..lineTo(0, size.height * .4)
+      ..close();
+    canvas.drawPath(path, p);
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
 }
 
 // ─── Tamamlama Modalı ─────────────────────────────────────────────────────────
@@ -635,6 +669,107 @@ class _ConfettiPainter extends CustomPainter {
 }
 
 // ─── Sonuç İstatistiği ────────────────────────────────────────────────────────
+
+// ─── Tamamlama Overlay ───────────────────────────────────────────────────────
+
+class _CompletedOverlay extends StatefulWidget {
+  final int diamonds;
+  final VoidCallback onNewGame;
+  const _CompletedOverlay({required this.diamonds, required this.onNewGame});
+
+  @override
+  State<_CompletedOverlay> createState() => _CompletedOverlayState();
+}
+
+class _CompletedOverlayState extends State<_CompletedOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _fade;
+  late Animation<double> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
+    _fade  = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _slide = Tween<double>(begin: 20.0, end: 0.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => Opacity(
+        opacity: _fade.value,
+        child: Transform.translate(
+          offset: Offset(0, _slide.value),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🏆', style: TextStyle(fontSize: 44)),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Tebrikler!',
+                      style: ZennTextStyles.headline2,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Bu sudokuyu tamamladın ve\n💎 +${widget.diamonds} elmas kazandın.',
+                      style: ZennTextStyles.body.copyWith(height: 1.6),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    GestureDetector(
+                      onTap: widget.onNewGame,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 28, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: ZennColors.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Yeni Oyun Başlat',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Result Stat ─────────────────────────────────────────────────────────────
 
 class _ResultStat extends StatelessWidget {
   final String label;
