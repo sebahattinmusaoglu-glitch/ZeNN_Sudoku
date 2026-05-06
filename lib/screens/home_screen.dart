@@ -178,11 +178,11 @@ class _DailyBanner extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const _DiamondWhite(),
+                      const Text('💎', style: TextStyle(fontSize: 13)),
                       const SizedBox(width: 5),
                       Text(
                         SupabaseService.instance.isSignedIn
-                        ? '+${AppConstants.diamondsDaily} elmas'
+                        ? '+${AppConstants.diamondsDaily} Elmas kazan'
                         : 'Giriş yap, 10 Elmas kazan',
                         style: TextStyle(
                           fontFamily: 'Inter',
@@ -366,10 +366,7 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
               // Elmas ödülü
               Row(
                 children: [
-                  CustomPaint(
-                    size: const Size(11, 11),
-                    painter: _SmallDiamondPainter(color: cfg.accentColor),
-                  ),
+                  const Text('💎', style: TextStyle(fontSize: 13)),
                   const SizedBox(width: 4),
                   Text(
                     '+${widget.difficulty.diamonds}',
@@ -385,9 +382,9 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
                     'Elmas',
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontSize: 10,
-                      fontWeight: FontWeight.w400,
-                      color: cfg.accentColor.withOpacity(0.65),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: cfg.accentColor.withOpacity(0.85),
                     ),
                   ),
                 ],
