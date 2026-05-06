@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../providers/game_provider.dart';
+import '../services/ad_service.dart';
 
 class NumberPad extends ConsumerWidget {
   const NumberPad({super.key});
@@ -180,9 +181,7 @@ class NumberPad extends ConsumerWidget {
                       );
                       break;
                     case HintResult.noDiamond:
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        _hintSnackBar('Yeterli elmas yok 💎'),
-                      );
+                      _showWatchAdDialog(context, ref);
                       break;
                   }
                 },
@@ -438,3 +437,60 @@ SnackBar _hintSnackBar(String message) => SnackBar(
   margin: const EdgeInsets.all(16),
   duration: const Duration(seconds: 2),
 );
+
+void _showWatchAdDialog(BuildContext context, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text(
+        'Elmas Yetersiz 💎',
+        style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
+      ),
+      content: const Text(
+        'İpucu için yeterli elmasın yok.\nKısa bir reklam izleyerek ücretsiz ipucu alabilirsin.',
+        style: TextStyle(fontFamily: 'Inter', fontSize: 14, height: 1.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Vazgeç',
+              style: TextStyle(color: ZennColors.textSoft)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ZennColors.primary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () {
+            Navigator.pop(context);
+            AdService.instance.showRewarded(
+              onRewarded: () async {
+                // Reklam izlendi → ücretsiz ipucu ver
+                final result =
+                    await ref.read(gameProvider.notifier).useHintFree();
+                if (!context.mounted) return;
+                if (result == HintResult.success) {
+                  ref.invalidate(profileProvider);
+                  if (ref.read(hapticEnabledProvider)) {
+                    HapticFeedback.mediumImpact();
+                  }
+                }
+              },
+              onFailed: () {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  _hintSnackBar('Reklam yüklenemedi, tekrar dene 🔄'),
+                );
+              },
+            );
+          },
+          child: const Text('Reklam İzle',
+              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600)),
+        ),
+      ],
+    ),
+  );
+}

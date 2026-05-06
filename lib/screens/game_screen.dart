@@ -17,7 +17,7 @@ class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
   @override
   ConsumerState<GameScreen> createState() => _GameScreenState();
-  }
+}
 
 class _GameScreenState extends ConsumerState<GameScreen>
     with TickerProviderStateMixin {
@@ -25,41 +25,46 @@ class _GameScreenState extends ConsumerState<GameScreen>
   late Animation<double>   _mistakeShakeAnim;
   final _bannerKey = UniqueKey();
   bool _isBannerLoaded = false;
-
+    
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
 
-    _mistakeShakeCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
-    _mistakeShakeAnim =
-        Tween<double>(begin: 0.0, end: 1.0).animate(_mistakeShakeCtrl);
+  _mistakeShakeCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 400));
+  _mistakeShakeAnim =
+      Tween<double>(begin: 0.0, end: 1.0).animate(_mistakeShakeCtrl);
 
-    // Banner reklamı yükle
-    AdService.instance.loadBanner(
-      onLoaded: () {
-        if (mounted) setState(() => _isBannerLoaded = true);
-      },
-    );
+  // Banner reklamı yükle
+  AdService.instance.loadBanner(
+    onLoaded: () {
+      if (mounted) setState(() => _isBannerLoaded = true);
+    },
+  );
+  _loadRewarded();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listenManual(gameProvider, (prev, next) {
-        if (prev?.isComplete == false && next?.isComplete == true) {
-          _onComplete();
-        }
-        if (prev != null && next != null &&
-            next.mistakeCount > prev.mistakeCount) {
-          _mistakeShakeCtrl.forward(from: 0);
-          if (ref.read(hapticEnabledProvider)) HapticFeedback.mediumImpact();
-        }
-      });
-      final state = ref.read(gameProvider);
-      if (state != null && state.isPaused) {
-        ref.read(gameProvider.notifier).togglePause();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    ref.listenManual(gameProvider, (prev, next) {
+      if (prev?.isComplete == false && next?.isComplete == true) {
+        _onComplete();
+      }
+      if (prev != null && next != null &&
+          next.mistakeCount > prev.mistakeCount) {
+        _mistakeShakeCtrl.forward(from: 0);
+        if (ref.read(hapticEnabledProvider)) HapticFeedback.mediumImpact();
       }
     });
-  }
+    final state = ref.read(gameProvider);
+    if (state != null && state.isPaused) {
+      ref.read(gameProvider.notifier).togglePause();
+    }
+  });
+}  // ← initState burada kapanıyor
 
+Future<void> _loadRewarded() async {
+  await AdService.instance.loadRewarded();
+}
+  
   @override
   void dispose() {
     _mistakeShakeCtrl.dispose();

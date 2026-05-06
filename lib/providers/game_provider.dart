@@ -259,6 +259,27 @@ class GameNotifier extends StateNotifier<GameState?> {
     state = s.copyWith(notes: newNotes);
   }
 
+  /// Reklam izledikten sonra elmas düşmeden ipucu verir
+  Future<HintResult> useHintFree() async {
+    if (state == null) return HintResult.noCell;
+    final s = state!;
+    if (s.selectedRow == null || s.selectedCol == null) return HintResult.noCell;
+    final r = s.selectedRow!;
+    final c = s.selectedCol!;
+    if (s.puzzle.given[r][c]) return HintResult.noCell;
+    if (s.puzzle.board[r][c] == s.puzzle.solution[r][c]) return HintResult.noCell;
+
+    final newBoard = s.puzzle.board.map((row) => List<int>.from(row)).toList();
+    newBoard[r][c] = s.puzzle.solution[r][c];
+    final newPuzzle = SudokuPuzzle(
+      board: newBoard, given: s.puzzle.given, solution: s.puzzle.solution,
+      difficulty: s.puzzle.difficulty, dailyId: s.puzzle.dailyId, date: s.puzzle.date,
+    );
+    state = s.copyWith(puzzle: newPuzzle, conflicts: {}, isComplete: newPuzzle.isSolved);
+    saveProgress();
+    return HintResult.success;
+  }
+
   Future<HintResult> useHint() async {
     if (state == null) return HintResult.noCell;
     final s = state!;
