@@ -86,7 +86,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     Container(
                       width: 100, height: 100,
                       decoration: BoxDecoration(
-                        color: ZennColors.primary,
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
@@ -96,7 +95,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           ),
                         ],
                       ),
-                      child: const _SudokuLogoIcon(),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: Image.asset(
+                          'assets/icons/icon.png',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 28),
                     ZennLogoText(size: 34),
@@ -123,39 +130,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Mini Sudoku Logo ─────────────────────────────────────────────────────────
-
-class _SudokuLogoIcon extends StatelessWidget {
-  const _SudokuLogoIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(18),
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 4,
-          crossAxisSpacing: 4,
-        ),
-        itemCount: 9,
-        itemBuilder: (_, i) {
-          final filled = [0, 2, 4, 6, 8].contains(i);
-          return Container(
-            decoration: BoxDecoration(
-              color: filled
-                  ? Colors.white.withOpacity(0.9)
-                  : Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          );
-        },
       ),
     );
   }
