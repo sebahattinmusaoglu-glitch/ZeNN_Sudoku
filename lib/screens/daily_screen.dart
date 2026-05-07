@@ -176,35 +176,23 @@ class _SignInStreakBanner extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
                 GestureDetector(
-                  onTap: () async {
-                    try {
-                      await SupabaseService.instance.signInWithGoogle();
-                      if (!context.mounted) return;
-                      ref.invalidate(profileProvider);
-                      ref.invalidate(completionStatsProvider);
-                      context.pop();
-                      context.push(AppConstants.routeDaily);
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Giriş başarısız: $e'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: ZennColors.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        margin: const EdgeInsets.all(16),
-                      ));
-                    }
-                  },
+                  onTap: () => context.push(AppConstants.routeAuth),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                    decoration: BoxDecoration(color: ZennColors.primary, borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(
+                        color: ZennColors.primary,
+                        borderRadius: BorderRadius.circular(10)),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.g_mobiledata, color: Colors.white, size: 20),
                         SizedBox(width: 6),
-                        Text('Google ile Giriş Yap',
-                            style: TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                        Text('Giriş Yap',
+                            style: TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white)),
                       ],
                     ),
                   ),

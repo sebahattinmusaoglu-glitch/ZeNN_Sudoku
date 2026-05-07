@@ -566,20 +566,7 @@ class _SignInPrompt extends ConsumerWidget {
               label: 'Google ile Giriş Yap',
               leading: const Icon(Icons.g_mobiledata,
                   color: Colors.white, size: 26),
-              onTap: () async {
-                try {
-                  await SupabaseService.instance.signInWithGoogle();
-                  if (!context.mounted) return;
-                  ref.invalidate(profileProvider);
-                  ref.invalidate(completionStatsProvider);
-                  context.pop();
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Giriş başarısız: $e')),
-                  );
-                }
-              },
+              onTap: () => context.push(AppConstants.routeAuth),
             ),
           ),
         ],

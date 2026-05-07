@@ -30,7 +30,8 @@ class AppConstants {
   static const String routeGame       = '/game';
   static const String routeDaily      = '/daily';
   static const String routeProfile    = '/profile';
-  static const String routeAbout      = '/about';       // ← eklendi
+  static const String routeAbout      = '/about';
+  static const String routeAuth       = '/auth';        // ← eklendi       // ← eklendi
 
   // ── Misc ──────────────────────────────────────────────────
   static const String appName  = 'ZeNN Sudoku';

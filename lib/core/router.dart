@@ -6,7 +6,9 @@ import '../screens/home_screen.dart';
 import '../screens/game_screen.dart';
 import '../screens/daily_screen.dart';
 import '../screens/profile_screen.dart';
-import '../screens/about_screen.dart';           // ← eklendi
+import '../screens/about_screen.dart';
+import '../screens/auth_screen.dart';           // ← eklendi
+import '../services/supabase_service.dart';
 
 final appRouter = GoRouter(
   initialLocation: AppConstants.routeSplash,
@@ -29,11 +31,17 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: AppConstants.routeProfile,
-      builder: (_, __) => const ProfileScreen(),
+      builder: (_, __) => SupabaseService.instance.isSignedIn
+          ? const ProfileScreen()
+          : const AuthScreen(),
     ),
-    GoRoute(                                      // ← eklendi
+    GoRoute(
       path: AppConstants.routeAbout,
       builder: (_, __) => const AboutScreen(),
+    ),
+    GoRoute(
+      path: AppConstants.routeAuth,
+      builder: (_, __) => const AuthScreen(),
     ),
   ],
 );

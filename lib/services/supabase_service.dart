@@ -14,27 +14,46 @@ class SupabaseService {
   // ─── Auth ─────────────────────────────────────────────────────────────────
 
   Stream<AuthState> get authStream => _client.auth.onAuthStateChange;
-
   User? get currentUser => _client.auth.currentUser;
-
   bool get isSignedIn => currentUser != null;
 
   Future<void> signInWithGoogle() async {
     final googleSignIn = GoogleSignIn();
-    final googleUser = await googleSignIn.signIn();
+    final googleUser   = await googleSignIn.signIn();
     if (googleUser == null) throw Exception('Google sign-in cancelled');
-
     final auth = await googleUser.authentication;
-    
-    if (auth.idToken == null) {
-      throw Exception('Google idToken null geldi');
-    }
-
+    if (auth.idToken == null) throw Exception('Google idToken null geldi');
     await _client.auth.signInWithIdToken(
-      provider: OAuthProvider.google,
-      idToken: auth.idToken!,
+      provider:    OAuthProvider.google,
+      idToken:     auth.idToken!,
       accessToken: auth.accessToken,
     );
+  }
+
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    await _client.auth.signInWithPassword(email: email, password: password);
+  }
+
+  Future<void> signUpWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final response = await _client.auth.signUp(
+      email:    email,
+      password: password,
+    );
+    // Supabase e-posta doğrulaması kapalıysa session hemen gelir
+    // Açıksa kullanıcı mail onaylayana kadar session gelmez
+    if (response.user == null) {
+      throw Exception('Kayıt başarısız');
+    }
+  }
+
+  Future<void> resetPassword(String email) async {
+    await _client.auth.resetPasswordForEmail(email);
   }
 
   Future<void> signOut() async {
@@ -79,7 +98,6 @@ class SupabaseService {
     return DailyPuzzle.fromMap(data);
   }
 
-  /// Has the current user already completed today's daily puzzle?
   Future<bool> hasDailyCompleted(String dailyPuzzleId) async {
     final userId = currentUser?.id;
     if (userId == null) return false;
@@ -102,12 +120,11 @@ class SupabaseService {
     final userId = currentUser?.id;
     if (userId == null) return;
 
-    final isDaily     = dailyPuzzleId != null;
-    final puzzleType  = isDaily ? 'daily' : difficulty.labelEn;
+    final isDaily    = dailyPuzzleId != null;
+    final puzzleType = isDaily ? 'daily' : difficulty.labelEn;
     final diamonds   = isDaily ? AppConstants.diamondsDaily : difficulty.diamonds;
 
-    // ── Duplicate kontrolü ──────────────────────────────────────────────
-    // Daily: aynı puzzle zaten tamamlandıysa atla
+    // Daily duplicate kontrolü
     if (isDaily) {
       final existing = await _client
           .from('completions')
@@ -115,19 +132,17 @@ class SupabaseService {
           .eq('user_id', userId)
           .eq('daily_puzzle_id', dailyPuzzleId)
           .maybeSingle();
-      if (existing != null) return;   // zaten tamamlanmış, işlemi durdur
+      if (existing != null) return;
     }
 
-    // Insert completion
     await _client.from('completions').insert({
-      'user_id':          userId,
-      'puzzle_type':      puzzleType,
-      'daily_puzzle_id':  dailyPuzzleId,
-      'time_taken':       timeTaken,
-      'diamonds_earned':  diamonds,
+      'user_id':         userId,
+      'puzzle_type':     puzzleType,
+      'daily_puzzle_id': dailyPuzzleId,
+      'time_taken':      timeTaken,
+      'diamonds_earned': diamonds,
     });
 
-    // Award diamonds via RPC
     await _client.rpc('award_diamonds', params: {
       'p_user_id':          userId,
       'p_amount':           diamonds,
@@ -135,9 +150,8 @@ class SupabaseService {
       'p_description':      'Completed $puzzleType puzzle',
     });
 
-    // Check monthly bonus if daily
     if (isDaily) {
-      final now = DateTime.now();
+      final now      = DateTime.now();
       final hasBonus = await _client.rpc<bool>('check_monthly_bonus', params: {
         'p_user_id': userId,
         'p_year':    now.year,
@@ -154,42 +168,45 @@ class SupabaseService {
     }
   }
 
+  Future<void> deductDiamond() async {
+    final userId = currentUser?.id;
+    if (userId == null) return;
+    await _client.rpc('award_diamonds', params: {
+      'p_user_id':          userId,
+      'p_amount':           -1,
+      'p_transaction_type': 'hint_used',
+      'p_description':      'Hint used',
+    });
+  }
+
   // ─── Monthly calendar ─────────────────────────────────────────────────────
 
-  /// Returns a set of date strings ('yyyy-MM-dd') completed this month
   Future<Set<String>> getMonthlyCompletions(int year, int month) async {
     final userId = currentUser?.id;
     if (userId == null) return {};
-
     final data = await _client
         .from('completions')
         .select('daily_puzzles(date)')
         .eq('user_id', userId)
         .eq('puzzle_type', 'daily');
-
     final Set<String> result = {};
     for (final row in data as List) {
       final dp = row['daily_puzzles'];
       if (dp == null) continue;
       final dateStr = dp['date'] as String;
       final d = DateTime.parse(dateStr);
-      if (d.year == year && d.month == month) {
-        result.add(dateStr);
-      }
+      if (d.year == year && d.month == month) result.add(dateStr);
     }
     return result;
   }
 
-  /// Returns total completions count per difficulty
   Future<Map<String, int>> getCompletionStats() async {
     final userId = currentUser?.id;
     if (userId == null) return {};
-
     final data = await _client
         .from('completions')
         .select('puzzle_type')
         .eq('user_id', userId);
-
     final Map<String, int> stats = {};
     for (final row in data as List) {
       final type = row['puzzle_type'] as String;
@@ -217,16 +234,4 @@ class SupabaseService {
         .lte('date', '$year-${month.toString().padLeft(2,'0')}-31');
     return (data as List).length;
   }
-
-    Future<void> deductDiamond() async {
-    final userId = currentUser?.id;
-    if (userId == null) return;
-    await _client.rpc('award_diamonds', params: {
-      'p_user_id':          userId,
-      'p_amount':           -1,
-      'p_transaction_type': 'hint_used',
-      'p_description':      'Hint used',
-    });
-  }
-
 }
