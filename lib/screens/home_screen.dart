@@ -120,6 +120,7 @@ class _DailyBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(profileProvider);
     final today = DateFormat('d MMMM', 'tr').format(DateTime.now());
 
     return GestureDetector(

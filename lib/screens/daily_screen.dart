@@ -63,6 +63,7 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(profileProvider, (_, __) => _loadCalendar());
     final daily      = ref.watch(dailyPuzzleProvider);
     final now        = DateTime.now();
     final isSignedIn = SupabaseService.instance.isSignedIn;

@@ -401,16 +401,12 @@ class _ActionButtonState extends State<_ActionButton>
               duration: const Duration(milliseconds: 150),
               height: 58,
               decoration: BoxDecoration(
-                color: widget.active ? ZennColors.primary : ZennColors.surfaceAlt,
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: widget.active
-                    ? [BoxShadow(
-                        color: ZennColors.primary.withOpacity(0.25),
-                        blurRadius: 8, offset: const Offset(0, 3))]
-                    : null,
+
               ),
               child: Icon(widget.icon, size: 22,
-                  color: widget.active ? Colors.white : ZennColors.textMid),
+                  color: widget.active ? ZennColors.primary : ZennColors.textMid),
             ),
             const SizedBox(height: 4),
             Text(

@@ -103,8 +103,8 @@ Future<void> _loadRewarded() async {
           time:       state.elapsedFormatted,
           mistakes:   state.mistakeCount,
           difficulty: state.puzzle.difficulty,
-          onContinue: () { Navigator.pop(context); context.pop(); },
-          onPlayAgain: () { Navigator.pop(context); context.pop(); },
+          onContinue: () { Navigator.pop(context); context.go(AppConstants.routeHome); },
+          onPlayAgain: () { Navigator.pop(context); context.go(AppConstants.routeHome); },
         ),
       ),
     );
@@ -175,7 +175,7 @@ Future<void> _loadRewarded() async {
                         diamonds: state.puzzle.dailyId != null
                             ? AppConstants.diamondsDaily
                             : state.puzzle.difficulty.diamonds,
-                        onNewGame: () => context.pop(),
+                        onNewGame: () => context.go(AppConstants.routeHome)
                       ),
                     ),
                 ],
