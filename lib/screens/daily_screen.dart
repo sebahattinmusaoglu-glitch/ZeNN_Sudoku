@@ -30,15 +30,24 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
     _loadCalendar();
   }
 
-  Future<void> _loadCalendar() async {
-    if (!SupabaseService.instance.isSignedIn) {
-      if (mounted) setState(() => _loadingCalendar = false);
-      return;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+      print('didChangeDependencies - isSignedIn: ${SupabaseService.instance.isSignedIn}, completedDates: ${_completedDates.length}');
+    if (SupabaseService.instance.isSignedIn && _completedDates.isEmpty) {
+      _loadCalendar();
     }
+  }
+
+  Future<void> _loadCalendar() async {
     final now       = DateTime.now();
+      print('today: ${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}');
     final completed = await SupabaseService.instance.getMonthlyCompletions(now.year, now.month);
+    print('completed dates: $completed');
     final totalPuzzles = await SupabaseService.instance.getMonthlyPuzzleCount(now.year, now.month);
+    print('total puzzles: $totalPuzzles');
     if (mounted) {
+      print('setState called, streak: ${_calcStreak(completed, now)}');
       setState(() {
         _completedDates  = completed;
         _totalPuzzleDays = totalPuzzles;
@@ -51,6 +60,7 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
   int _calcStreak(Set<String> completed, DateTime now) {
     int streak = 0;
     final todayKey = '${now.year.toString().padLeft(4,'0')}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+      print('todayKey: $todayKey, completed contains today: ${completed.contains(todayKey)}');
     DateTime cursor = completed.contains(todayKey) ? now : now.subtract(const Duration(days: 1));
     while (true) {
       final key = '${cursor.year.toString().padLeft(4,'0')}-${cursor.month.toString().padLeft(2,'0')}-${cursor.day.toString().padLeft(2,'0')}';
@@ -63,10 +73,19 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(profileProvider, (_, __) => _loadCalendar());
+    // Giriş yapıldığında _loadCalendar'ı tetikle
+    ref.listen(profileProvider, (prev, next) {
+      final wasSignedIn = prev?.valueOrNull != null;
+      final isSignedIn  = next.valueOrNull != null;
+      if (!wasSignedIn && isSignedIn) {
+        _loadCalendar();
+      }
+    });
+
     final daily      = ref.watch(dailyPuzzleProvider);
     final now        = DateTime.now();
-    final isSignedIn = SupabaseService.instance.isSignedIn;
+    final isSignedIn = ref.watch(profileProvider).valueOrNull != null;
+    // ↑ SupabaseService.instance.isSignedIn yerine bunu kullan
 
     return Scaffold(
       backgroundColor: ZennColors.background,
@@ -350,7 +369,7 @@ class _TodayCard extends ConsumerWidget {
                   Text(
                     isCompleted
                       ? '+${AppConstants.diamondsDaily} elmas kazandın ✓'
-                      : !SupabaseService.instance.isSignedIn
+                      : ref.watch(profileProvider).valueOrNull != null
                           ? 'Giriş yaparak elmas ve bonus kazan'
                           : hasSavedGame
                               ? 'Kaldığın yerden devam et'

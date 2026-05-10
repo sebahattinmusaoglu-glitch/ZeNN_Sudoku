@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "542167490742",
+    "project_id": "zenn-sudoku",
+    "storage_bucket": "zenn-sudoku.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:542167490742:android:09fd02844351afbe8d4617",
+        "android_client_info": {
+          "package_name": "com.zennappstudio.zenn_sudoku"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "542167490742-iltml555dlpn947aikicva0lbhsk6u9n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zennappstudio.zenn_sudoku",
+            "certificate_hash": "a0bb7637e901ded47f67c01386f0b19c88e8cefb"
+          }
+        },
+        {
+          "client_id": "542167490742-tj10r63j5o6qgv0jmsk0m0qdem6jc63g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zennappstudio.zenn_sudoku",
+            "certificate_hash": "c4a9d40f9676fd8faca8e6bc603dd6934eac154f"
+          }
+        },
+        {
+          "client_id": "542167490742-k4t0ljt4oc267nqsteh54ng5s2khncm2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXLk-pvg6gnKFxDIzGSrvrIyNiTmF89bY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "542167490742-k4t0ljt4oc267nqsteh54ng5s2khncm2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

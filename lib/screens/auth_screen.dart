@@ -119,10 +119,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                 controller: _tabCtrl,
                 children: [
                   _SignInForm(onSuccess: () {
-                    ref.invalidate(profileProvider);
-                    ref.invalidate(completionStatsProvider);
-                    context.pop();
-                  }),
+                  ref.invalidate(profileProvider);
+                  ref.invalidate(completionStatsProvider);
+                  context.pop();
+                  // daily screen açıksa yenile
+                  context.push(AppConstants.routeDaily);
+                }),
                   _SignUpForm(onSuccess: () {
                     ref.invalidate(profileProvider);
                     ref.invalidate(completionStatsProvider);
@@ -193,6 +195,7 @@ class _GoogleSignInButtonState extends State<_GoogleSignInButton> {
       await SupabaseService.instance.signInWithGoogle();
       widget.onSuccess();
     } catch (e) {
+       print('GOOGLE ERROR: $e');
       if (!mounted) return;
       _showError(context, 'Google girişi başarısız: $e');
     } finally {

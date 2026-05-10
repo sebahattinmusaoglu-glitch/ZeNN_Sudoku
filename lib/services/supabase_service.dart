@@ -18,8 +18,10 @@ class SupabaseService {
   bool get isSignedIn => currentUser != null;
 
   Future<void> signInWithGoogle() async {
-    final googleSignIn = GoogleSignIn();
-    final googleUser   = await googleSignIn.signIn();
+    final googleSignIn = GoogleSignIn(
+      serverClientId: '542167490742-k4t0ljt4oc267nqsteh54ng5s2khncm2.apps.googleusercontent.com',
+    );
+    final googleUser = await googleSignIn.signIn();
     if (googleUser == null) throw Exception('Google sign-in cancelled');
     final auth = await googleUser.authentication;
     if (auth.idToken == null) throw Exception('Google idToken null geldi');
