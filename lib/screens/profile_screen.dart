@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/theme.dart';
 import '../core/constants.dart';
+import '../core/l10n.dart';
 import '../providers/game_provider.dart';
 import '../services/supabase_service.dart';
 import '../widgets/common_widgets.dart';
@@ -19,6 +20,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s       = strings(context);
     final profile = ref.watch(profileProvider);
     final stats   = ref.watch(completionStatsProvider);
 
@@ -28,10 +30,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         data: (p) {
           if (p == null) return _SignInPrompt();
           final totalCompleted = stats.valueOrNull != null
-              ? (stats.valueOrNull!['easy'] ?? 0) +
+              ? (stats.valueOrNull!['easy']   ?? 0) +
                 (stats.valueOrNull!['medium'] ?? 0) +
-                (stats.valueOrNull!['hard'] ?? 0) +
-                (stats.valueOrNull!['daily'] ?? 0)
+                (stats.valueOrNull!['hard']   ?? 0) +
+                (stats.valueOrNull!['daily']  ?? 0)
               : 0;
 
           return SingleChildScrollView(
@@ -39,9 +41,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 // ── Gradient header + avatar ─────────────────────────────
                 _ProfileHeader(
-                  avatarUrl: p.avatarUrl,
-                  username: p.username,
-                  email: p.email,
+                  avatarUrl:      p.avatarUrl,
+                  username:       p.username,
+                  email:          p.email,
                   totalCompleted: totalCompleted,
                 ),
 
@@ -58,7 +60,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                       // ── Tamamlanan bulmacalar ────────────────────────────
                       stats.when(
-                        data: (s) => _StatsGrid(stats: s),
+                        data: (st) => _StatsGrid(stats: st),
                         loading: () => const LinearProgressIndicator(),
                         error: (_, __) => const SizedBox.shrink(),
                       ),
@@ -72,7 +74,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                       // ── Çıkış ────────────────────────────────────────────
                       ZennButton(
-                        label: 'Çıkış Yap',
+                        label: s.settingsSignOut,
                         loading: _signingOut,
                         color: const Color(0xFFBA1A1A),
                         onTap: () async {
@@ -107,7 +109,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
-// ─── Profil Header (gradient arka plan + avatar) ──────────────────────────────
+// ─── Profil Header ────────────────────────────────────────────────────────────
 
 class _ProfileHeader extends StatelessWidget {
   final String? avatarUrl;
@@ -124,6 +126,7 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = strings(context);
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -172,7 +175,8 @@ class _ProfileHeader extends StatelessWidget {
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Text(
-                        '$totalCompleted bulmaca tamamlandı',
+                        s.profilePuzzlesCompleted.replaceFirst(
+                            '{n}', '$totalCompleted'),
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 12,
@@ -187,14 +191,13 @@ class _ProfileHeader extends StatelessWidget {
           ),
         ),
 
-        // Avatar + isim (gradient'in altına taşar)
+        // Avatar + isim
         Positioned(
           top: 110,
           left: 0,
           right: 0,
           child: Column(
             children: [
-              // Avatar dairesi
               Container(
                 width: 88,
                 height: 88,
@@ -229,7 +232,7 @@ class _ProfileHeader extends StatelessWidget {
           ),
         ),
 
-        // Header'ın yüksekliğini tutan boş alan
+        // Header yüksekliğini tutan boşluk
         const SizedBox(height: 280),
       ],
     );
@@ -244,6 +247,7 @@ class _DiamondCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = strings(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -261,9 +265,9 @@ class _DiamondCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Toplam Kazandığın',
-                  style: TextStyle(
+                Text(
+                  s.diamondCardSubtitle,
+                  style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 13,
                     color: Colors.white70,
@@ -272,7 +276,7 @@ class _DiamondCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${diamonds.toString()} Elmas',
+                  '$diamonds ${s.diamondsLabel}',
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 36,
@@ -298,93 +302,75 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = strings(context);
     final items = [
-      _StatItem(
-          label: 'Kolay',
-          value: stats['easy'] ?? 0,
-          icon: Icons.circle,
-          color: ZennColors.easy),
-      _StatItem(
-          label: 'Orta',
-          value: stats['medium'] ?? 0,
-          icon: Icons.circle,
-          color: ZennColors.medium),
-      _StatItem(
-          label: 'Zor',
-          value: stats['hard'] ?? 0,
-          icon: Icons.circle,
-          color: ZennColors.hard),
-      _StatItem(
-          label: 'Günlük',
-          value: stats['daily'] ?? 0,
-          icon: Icons.calendar_today_rounded,
-          color: ZennColors.daily),
+      _StatItem(label: s.statsEasy,   value: stats['easy']   ?? 0, icon: Icons.circle,                  color: ZennColors.easy),
+      _StatItem(label: s.statsMedium, value: stats['medium'] ?? 0, icon: Icons.circle,                  color: ZennColors.medium),
+      _StatItem(label: s.statsHard,   value: stats['hard']   ?? 0, icon: Icons.circle,                  color: ZennColors.hard),
+      _StatItem(label: s.statsDaily,  value: stats['daily']  ?? 0, icon: Icons.calendar_today_rounded,  color: ZennColors.daily),
     ];
-    final total = items.fold(0, (s, i) => s + i.value);
+    final total = items.fold(0, (acc, i) => acc + i.value);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text('Tamamlanan Bulmacalar',
-                style: ZennTextStyles.headline3),
+            Text(s.statsCompletedTitle, style: ZennTextStyles.headline3),
             const Spacer(),
-            Text('Toplam: $total', style: ZennTextStyles.caption),
+            Text(
+              s.statsTotal.replaceFirst('{n}', '$total'),
+              style: ZennTextStyles.caption,
+            ),
           ],
         ),
         const SizedBox(height: 14),
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero, 
+          padding: EdgeInsets.zero,
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 2.2,
-          children: items
-              .map((item) => Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: ZennColors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: ZennColors.border),
+          children: items.map((item) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: ZennColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: ZennColors.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: item.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(item.icon, size: 18, color: item.color),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item.value.toString(),
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: ZennColors.textDark,
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: item.color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(item.icon,
-                              size: 18, color: item.color),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              item.value.toString(),
-                              style: const TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                color: ZennColors.textDark,
-                              ),
-                            ),
-                            Text(item.label,
-                                style: ZennTextStyles.caption),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ))
-              .toList(),
+                    Text(item.label, style: ZennTextStyles.caption),
+                  ],
+                ),
+              ],
+            ),
+          )).toList(),
         ),
       ],
     );
@@ -396,11 +382,12 @@ class _StatItem {
   final int value;
   final IconData icon;
   final Color color;
-  const _StatItem(
-      {required this.label,
-      required this.value,
-      required this.icon,
-      required this.color});
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
 }
 
 // ─── Ayarlar Bölümü ───────────────────────────────────────────────────────────
@@ -408,12 +395,13 @@ class _StatItem {
 class _SettingsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s           = strings(context);
     final hapticEnabled = ref.watch(hapticEnabledProvider);
 
     void showComingSoon() {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Bu özellik yakında kullanılabilecek 🚀'),
+          content: Text(s.settingsComingSoon),
           behavior: SnackBarBehavior.floating,
           backgroundColor: ZennColors.primary,
           shape: RoundedRectangleBorder(
@@ -427,7 +415,7 @@ class _SettingsSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Ayarlar', style: ZennTextStyles.headline3),
+        Text(s.profileSettings, style: ZennTextStyles.headline3),
         const SizedBox(height: 14),
         Container(
           decoration: BoxDecoration(
@@ -437,38 +425,40 @@ class _SettingsSection extends ConsumerWidget {
           ),
           child: Column(
             children: [
-              // Bildirimler — yakında
+              // Bildirimler
               _SettingsTile(
                 icon: Icons.notifications_outlined,
-                label: 'Bildirimler',
-                subtitle: 'Yakında',
+                label: s.settingsNotifications,
+                subtitle: s.settingsNotificationsSoon,
                 trailing: Switch(
-                    value: false,
-                    onChanged: (_) => showComingSoon(),
-                    thumbColor: WidgetStateProperty.all(Colors.white),
-                    trackColor: WidgetStateProperty.all(ZennColors.gridLine),
-                    trackOutlineColor: WidgetStateProperty.all(ZennColors.gridLine),
+                  value: false,
+                  onChanged: (_) => showComingSoon(),
+                  thumbColor: WidgetStateProperty.all(Colors.white),
+                  trackColor: WidgetStateProperty.all(ZennColors.gridLine),
+                  trackOutlineColor:
+                      WidgetStateProperty.all(ZennColors.gridLine),
                 ),
               ),
               const Divider(height: 1, indent: 56),
-              // Karanlık Mod — yakında
+              // Karanlık Mod
               _SettingsTile(
                 icon: Icons.dark_mode_outlined,
-                label: 'Karanlık Mod',
-                subtitle: 'Yakında',
+                label: s.settingsDarkMode,
+                subtitle: s.settingsDarkModeSoon,
                 trailing: Switch(
-                    value: false,
-                    onChanged: (_) => showComingSoon(),
-                    thumbColor: WidgetStateProperty.all(Colors.white),
-                    trackColor: WidgetStateProperty.all(ZennColors.gridLine),
-                    trackOutlineColor: WidgetStateProperty.all(ZennColors.gridLine),
+                  value: false,
+                  onChanged: (_) => showComingSoon(),
+                  thumbColor: WidgetStateProperty.all(Colors.white),
+                  trackColor: WidgetStateProperty.all(ZennColors.gridLine),
+                  trackOutlineColor:
+                      WidgetStateProperty.all(ZennColors.gridLine),
                 ),
               ),
               const Divider(height: 1, indent: 56),
-              // Titreşim — çalışır
+              // Titreşim
               _SettingsTile(
                 icon: Icons.vibration_rounded,
-                label: 'Titreşim',
+                label: s.settingsHaptic,
                 trailing: Switch(
                   value: hapticEnabled,
                   onChanged: (v) =>
@@ -477,9 +467,10 @@ class _SettingsSection extends ConsumerWidget {
                 ),
               ),
               const Divider(height: 1, indent: 56),
+              // Uygulama Hakkında
               _SettingsTile(
                 icon: Icons.info_outlined,
-                label: 'Uygulama Hakkında',
+                label: s.settingsAbout,
                 trailing: const Icon(Icons.chevron_right_rounded,
                     color: ZennColors.textHint),
                 onTap: () => context.push(AppConstants.routeAbout),
@@ -544,6 +535,7 @@ class _SettingsTile extends StatelessWidget {
 class _SignInPrompt extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = strings(context);
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -552,10 +544,10 @@ class _SignInPrompt extends ConsumerWidget {
           const Icon(Icons.account_circle_outlined,
               size: 80, color: ZennColors.textHint),
           const SizedBox(height: 16),
-          Text('Giriş Yapın', style: ZennTextStyles.headline2),
+          Text(s.signInPromptTitle, style: ZennTextStyles.headline2),
           const SizedBox(height: 8),
           Text(
-            'Elmas kazanmak ve istatistiklerinizi\ntakip etmek için giriş yapın.',
+            s.signInPromptBody,
             style: ZennTextStyles.body,
             textAlign: TextAlign.center,
           ),
@@ -563,7 +555,7 @@ class _SignInPrompt extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: ZennButton(
-              label: 'Google ile Giriş Yap',
+              label: s.authSignInGoogle,
               leading: const Icon(Icons.g_mobiledata,
                   color: Colors.white, size: 26),
               onTap: () => context.push(AppConstants.routeAuth),

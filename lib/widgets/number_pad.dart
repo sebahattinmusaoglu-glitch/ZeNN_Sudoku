@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
+import '../core/l10n.dart';
 import '../providers/game_provider.dart';
 import '../services/ad_service.dart';
 
@@ -11,6 +12,7 @@ class NumberPad extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = strings(context);
     final state = ref.watch(gameProvider);
     if (state == null) return const SizedBox.shrink();
     final hapticOn = ref.read(hapticEnabledProvider);
@@ -39,15 +41,15 @@ class NumberPad extends ConsumerWidget {
                     border: Border.all(
                         color: ZennColors.primary.withOpacity(0.22)),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.edit_outlined,
+                      const Icon(Icons.edit_outlined,
                           size: 13, color: ZennColors.primary),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(
-                        'NOT MODU AKTİF — Sayı seç, hücreye not ekle',
-                        style: TextStyle(
+                        s.noteModeActive,
+                        style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -92,7 +94,7 @@ class NumberPad extends ConsumerWidget {
             Expanded(
               child: _ActionButton(
                 icon: Icons.undo_rounded,
-                label: 'Geri Al',
+                label: s.numpadUndo,
                 onTap: () {
                   if (hapticOn) HapticFeedback.lightImpact();
                   ref.read(gameProvider.notifier).undo();
@@ -137,7 +139,7 @@ class NumberPad extends ConsumerWidget {
                 padding: const EdgeInsets.only(right: 5),
                 child: _ActionButton(
                   icon: Icons.backspace_outlined,
-                  label: 'Sil',
+                  label: s.numpadErase,
                   onTap: () {
                     if (hapticOn) HapticFeedback.lightImpact();
                     ref.read(gameProvider.notifier).erase();
@@ -151,7 +153,7 @@ class NumberPad extends ConsumerWidget {
                 padding: const EdgeInsets.only(right: 5),
                 child: _ActionButton(
                   icon: Icons.edit_outlined,
-                  label: 'Not',
+                  label: s.numpadNote,
                   active: state.isNoteMode,
                   onTap: () {
                     if (hapticOn) HapticFeedback.lightImpact();
@@ -164,7 +166,7 @@ class NumberPad extends ConsumerWidget {
             Expanded(
               child: _ActionButton(
                 icon: Icons.lightbulb_outline_rounded,
-                label: 'İpucu',
+                label: s.numpadHint,
                 onTap: () async {
                   if (hapticOn) HapticFeedback.lightImpact();
                   final result =
@@ -177,7 +179,7 @@ class NumberPad extends ConsumerWidget {
                       break;
                     case HintResult.noCell:
                       ScaffoldMessenger.of(context).showSnackBar(
-                        _hintSnackBar('Önce bir hücre seç 👆'),
+                        _hintSnackBar(strings(context).hintNoCell),
                       );
                       break;
                     case HintResult.noDiamond:
@@ -193,7 +195,6 @@ class NumberPad extends ConsumerWidget {
     );
   }
 }
-
 
 // ─── Sayı Butonu ─────────────────────────────────────────────────────────────
 
@@ -262,9 +263,7 @@ class _NumberButtonState extends State<_NumberButton>
                     : ZennColors.cardLight,
             borderRadius: BorderRadius.circular(12),
             border: !widget.done && widget.isNoteMode
-                ? Border.all(
-                    color: ZennColors.primary.withOpacity(0.3),
-                  )
+                ? Border.all(color: ZennColors.primary.withOpacity(0.3))
                 : null,
             boxShadow: widget.done
                 ? null
@@ -290,7 +289,6 @@ class _NumberButtonState extends State<_NumberButton>
                           : ZennColors.textDark,
                 ),
               ),
-              // Kalan kullanım sayısı: ≤5 → nokta, >5 → rakam
               if (!widget.done) ...[
                 const SizedBox(height: 4),
                 _RemainingDots(remaining: widget.remaining),
@@ -311,7 +309,6 @@ class _RemainingDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 6+ kalan varsa sayı göster, 5 ve altı nokta
     if (remaining > 5) {
       return Text(
         remaining.toString(),
@@ -323,7 +320,6 @@ class _RemainingDots extends StatelessWidget {
         ),
       );
     }
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(
@@ -403,10 +399,14 @@ class _ActionButtonState extends State<_ActionButton>
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-
               ),
-              child: Icon(widget.icon, size: 22,
-                  color: widget.active ? ZennColors.primary : ZennColors.textMid),
+              child: Icon(
+                widget.icon,
+                size: 22,
+                color: widget.active
+                    ? ZennColors.primary
+                    : ZennColors.textMid,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -414,8 +414,11 @@ class _ActionButtonState extends State<_ActionButton>
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 10,
-                fontWeight: widget.active ? FontWeight.w600 : FontWeight.w400,
-                color: widget.active ? ZennColors.primary : ZennColors.textSoft,
+                fontWeight:
+                    widget.active ? FontWeight.w600 : FontWeight.w400,
+                color: widget.active
+                    ? ZennColors.primary
+                    : ZennColors.textSoft,
               ),
             ),
           ],
@@ -425,33 +428,40 @@ class _ActionButtonState extends State<_ActionButton>
   }
 }
 
+// ─── Yardımcı: SnackBar ───────────────────────────────────────────────────────
+
 SnackBar _hintSnackBar(String message) => SnackBar(
-  content: Text(message),
-  behavior: SnackBarBehavior.floating,
-  backgroundColor: ZennColors.primary,
-  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-  margin: const EdgeInsets.all(16),
-  duration: const Duration(seconds: 2),
-);
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: ZennColors.primary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 2),
+    );
+
+// ─── Reklam İzle Dialogu ──────────────────────────────────────────────────────
 
 void _showWatchAdDialog(BuildContext context, WidgetRef ref) {
+  final s = strings(context);
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Elmas Yetersiz 💎',
-        style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
+      title: Text(
+        s.hintNoDiamondsTitle,
+        style: const TextStyle(
+            fontFamily: 'Inter', fontWeight: FontWeight.w700),
       ),
-      content: const Text(
-        'İpucu için yeterli elmasın yok.\nKısa bir reklam izleyerek ücretsiz ipucu alabilirsin.',
-        style: TextStyle(fontFamily: 'Inter', fontSize: 14, height: 1.5),
+      content: Text(
+        s.hintNoDiamondsBody,
+        style: const TextStyle(
+            fontFamily: 'Inter', fontSize: 14, height: 1.5),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Vazgeç',
-              style: TextStyle(color: ZennColors.textSoft)),
+          child: Text(s.hintAdCancel,
+              style: const TextStyle(color: ZennColors.textSoft)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -464,7 +474,6 @@ void _showWatchAdDialog(BuildContext context, WidgetRef ref) {
             Navigator.pop(context);
             AdService.instance.showRewarded(
               onRewarded: () async {
-                // Reklam izlendi → ücretsiz ipucu ver
                 final result =
                     await ref.read(gameProvider.notifier).useHintFree();
                 if (!context.mounted) return;
@@ -478,13 +487,16 @@ void _showWatchAdDialog(BuildContext context, WidgetRef ref) {
               onFailed: () {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  _hintSnackBar('Reklam yüklenemedi, tekrar dene 🔄'),
+                  _hintSnackBar(strings(context).hintAdFailed),
                 );
               },
             );
           },
-          child: const Text('Reklam İzle',
-              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600)),
+          child: Text(
+            s.hintWatchAd,
+            style: const TextStyle(
+                fontFamily: 'Inter', fontWeight: FontWeight.w600),
+          ),
         ),
       ],
     ),

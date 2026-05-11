@@ -27,8 +27,9 @@ Future<void> main() async {
     ),
   );
 
-  // Initialize locales for intl (Turkish date formatting)
+  // Initialize locales for intl (Turkish + English date formatting)
   await initializeDateFormatting('tr', null);
+  await initializeDateFormatting('en', null);
 
   // Initialize Supabase
   await Supabase.initialize(
@@ -59,7 +60,7 @@ class ZennSudokuApp extends StatelessWidget {
       theme: buildZennTheme(),
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
-      locale: const Locale('tr', 'TR'),
+      // locale: const Locale('tr', 'TR'), // KALDIRILDI — sistem diline bırakılıyor
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -69,6 +70,14 @@ class ZennSudokuApp extends StatelessWidget {
         Locale('tr', 'TR'),
         Locale('en', 'US'),
       ],
+      // Sistem dili TR veya EN değilse → EN'e düş
+      localeResolutionCallback: (locale, supportedLocales) {
+        if (locale == null) return const Locale('en');
+        for (final supported in supportedLocales) {
+          if (supported.languageCode == locale.languageCode) return supported;
+        }
+        return const Locale('en');
+      },
     );
   }
 }

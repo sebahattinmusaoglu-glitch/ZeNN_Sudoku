@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../core/theme.dart';
 import '../core/constants.dart';
+import '../core/l10n.dart';
 import '../models/puzzle.dart';
 import '../providers/game_provider.dart';
 import '../services/supabase_service.dart';
@@ -21,8 +22,8 @@ class DailyScreen extends ConsumerStatefulWidget {
 class _DailyScreenState extends ConsumerState<DailyScreen> {
   Set<String> _completedDates = {};
   bool _loadingCalendar = true;
-  int _totalPuzzleDays  = 0;
-  int _currentStreak    = 0;
+  int  _totalPuzzleDays = 0;
+  int  _currentStreak   = 0;
 
   @override
   void initState() {
@@ -33,21 +34,16 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-      print('didChangeDependencies - isSignedIn: ${SupabaseService.instance.isSignedIn}, completedDates: ${_completedDates.length}');
     if (SupabaseService.instance.isSignedIn && _completedDates.isEmpty) {
       _loadCalendar();
     }
   }
 
   Future<void> _loadCalendar() async {
-    final now       = DateTime.now();
-      print('today: ${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}');
-    final completed = await SupabaseService.instance.getMonthlyCompletions(now.year, now.month);
-    print('completed dates: $completed');
+    final now          = DateTime.now();
+    final completed    = await SupabaseService.instance.getMonthlyCompletions(now.year, now.month);
     final totalPuzzles = await SupabaseService.instance.getMonthlyPuzzleCount(now.year, now.month);
-    print('total puzzles: $totalPuzzles');
     if (mounted) {
-      print('setState called, streak: ${_calcStreak(completed, now)}');
       setState(() {
         _completedDates  = completed;
         _totalPuzzleDays = totalPuzzles;
@@ -59,11 +55,15 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
 
   int _calcStreak(Set<String> completed, DateTime now) {
     int streak = 0;
-    final todayKey = '${now.year.toString().padLeft(4,'0')}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
-      print('todayKey: $todayKey, completed contains today: ${completed.contains(todayKey)}');
-    DateTime cursor = completed.contains(todayKey) ? now : now.subtract(const Duration(days: 1));
+    final todayKey = '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    DateTime cursor =
+        completed.contains(todayKey) ? now : now.subtract(const Duration(days: 1));
     while (true) {
-      final key = '${cursor.year.toString().padLeft(4,'0')}-${cursor.month.toString().padLeft(2,'0')}-${cursor.day.toString().padLeft(2,'0')}';
+      final key = '${cursor.year.toString().padLeft(4, '0')}-'
+          '${cursor.month.toString().padLeft(2, '0')}-'
+          '${cursor.day.toString().padLeft(2, '0')}';
       if (!completed.contains(key)) break;
       streak++;
       cursor = cursor.subtract(const Duration(days: 1));
@@ -73,24 +73,23 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Giriş yapıldığında _loadCalendar'ı tetikle
+    final s = strings(context);
+
     ref.listen(profileProvider, (prev, next) {
       final wasSignedIn = prev?.valueOrNull != null;
       final isSignedIn  = next.valueOrNull != null;
-      if (!wasSignedIn && isSignedIn) {
-        _loadCalendar();
-      }
+      if (!wasSignedIn && isSignedIn) _loadCalendar();
     });
 
     final daily      = ref.watch(dailyPuzzleProvider);
     final now        = DateTime.now();
     final isSignedIn = ref.watch(profileProvider).valueOrNull != null;
-    // ↑ SupabaseService.instance.isSignedIn yerine bunu kullan
+    final locale     = Localizations.localeOf(context).languageCode;
 
     return Scaffold(
       backgroundColor: ZennColors.background,
       appBar: AppBar(
-        title: const Text('Günün Sudokusu'),
+        title: Text(s.dailyTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => context.pop(),
@@ -116,9 +115,9 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
 
             // ── Bugünü Oyna ──────────────────────────────────────────
             daily.when(
-              data: (puzzle) => puzzle != null ? _TodayCard(puzzle: puzzle) : const _NoPuzzleCard(),
+              data:    (puzzle) => puzzle != null ? _TodayCard(puzzle: puzzle) : const _NoPuzzleCard(),
               loading: () => const _PuzzleCardSkeleton(),
-              error: (_, __) => const _NoPuzzleCard(),
+              error:   (_, __) => const _NoPuzzleCard(),
             ),
 
             // ── Takvim + İlerleme (sadece giriş yapılmışsa) ──────────
@@ -126,29 +125,44 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
               const SizedBox(height: 28),
               Row(
                 children: [
-                  Text(DateFormat('MMMM yyyy', 'tr').format(now), style: ZennTextStyles.headline3),
+                  Text(
+                    DateFormat('MMMM yyyy', locale).format(now),
+                    style: ZennTextStyles.headline3,
+                  ),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: ZennColors.cardLight, borderRadius: BorderRadius.circular(100)),
+                    decoration: BoxDecoration(
+                      color: ZennColors.cardLight,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.stars_rounded, size: 14, color: ZennColors.primary),
                         const SizedBox(width: 4),
-                        Text('Bonus: +${AppConstants.diamondsMonthly} 💎',
-                            style: const TextStyle(fontFamily: 'Inter', fontSize: 11, fontWeight: FontWeight.w600, color: ZennColors.primary)),
+                        Text(
+                          s.dailyBonusChip.replaceFirst('{n}', '${AppConstants.diamondsMonthly}'),
+                          style: const TextStyle(
+                              fontFamily: 'Inter', fontSize: 11,
+                              fontWeight: FontWeight.w600, color: ZennColors.primary),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
-              _MonthlyProgress(completedCount: _completedDates.length, totalDays: _totalPuzzleDays),
+              _MonthlyProgress(
+                completedCount: _completedDates.length,
+                totalDays: _totalPuzzleDays,
+              ),
               const SizedBox(height: 16),
               _loadingCalendar
                   ? const LinearProgressIndicator()
-                  : _MonthCalendar(year: now.year, month: now.month, completedDates: _completedDates, today: now),
+                  : _MonthCalendar(
+                      year: now.year, month: now.month,
+                      completedDates: _completedDates, today: now),
             ],
 
             const SizedBox(height: 40),
@@ -166,6 +180,7 @@ class _SignInStreakBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = strings(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
@@ -179,7 +194,7 @@ class _SignInStreakBanner extends ConsumerWidget {
         children: [
           Container(
             width: 72, height: 72,
-            decoration: BoxDecoration(color: ZennColors.surfaceAlt, shape: BoxShape.circle),
+            decoration: const BoxDecoration(color: ZennColors.surfaceAlt, shape: BoxShape.circle),
             child: const Center(child: Text('🔒', style: TextStyle(fontSize: 30))),
           ),
           const SizedBox(width: 16),
@@ -187,10 +202,10 @@ class _SignInStreakBanner extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Serine başla!', style: ZennTextStyles.headline3),
+                Text(s.streakSignInTitle, style: ZennTextStyles.headline3),
                 const SizedBox(height: 6),
                 Text(
-                  'Giriş yap, günlük serini takip et ve aylık\n+${AppConstants.diamondsMonthly} 💎 bonus kazan.',
+                  s.streakSignInBody.replaceFirst('{n}', '${AppConstants.diamondsMonthly}'),
                   style: ZennTextStyles.caption.copyWith(height: 1.5),
                 ),
                 const SizedBox(height: 14),
@@ -199,19 +214,16 @@ class _SignInStreakBanner extends ConsumerWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                     decoration: BoxDecoration(
-                        color: ZennColors.primary,
-                        borderRadius: BorderRadius.circular(10)),
-                    child: const Row(
+                        color: ZennColors.primary, borderRadius: BorderRadius.circular(10)),
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.g_mobiledata, color: Colors.white, size: 20),
-                        SizedBox(width: 6),
-                        Text('Giriş Yap',
-                            style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white)),
+                        const Icon(Icons.g_mobiledata, color: Colors.white, size: 20),
+                        const SizedBox(width: 6),
+                        Text(s.authSignIn,
+                            style: const TextStyle(
+                                fontFamily: 'Inter', fontSize: 13,
+                                fontWeight: FontWeight.w600, color: Colors.white)),
                       ],
                     ),
                   ),
@@ -234,19 +246,29 @@ class _StreakHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = strings(context);
+
     if (loading) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
-        decoration: BoxDecoration(color: ZennColors.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: ZennColors.border)),
-        child: const Row(children: [
-          SizedBox(width: 72, height: 72),
-          SizedBox(width: 16),
+        decoration: BoxDecoration(
+            color: ZennColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: ZennColors.border)),
+        child: Row(children: [
+          const SizedBox(width: 72, height: 72),
+          const SizedBox(width: 16),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(width: 120, height: 16,
-                child: LinearProgressIndicator(backgroundColor: ZennColors.border, valueColor: AlwaysStoppedAnimation(ZennColors.primary))),
-            SizedBox(height: 8),
-            Text('Veriler güncelleniyor...', style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: ZennColors.textHint)),
+            const SizedBox(
+              width: 120, height: 16,
+              child: LinearProgressIndicator(
+                  backgroundColor: ZennColors.border,
+                  valueColor: AlwaysStoppedAnimation(ZennColors.primary)),
+            ),
+            const SizedBox(height: 8),
+            Text(s.streakUpdating,
+                style: const TextStyle(fontFamily: 'Inter', fontSize: 12, color: ZennColors.textHint)),
           ]),
         ]),
       );
@@ -256,7 +278,10 @@ class _StreakHero extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
-      decoration: BoxDecoration(color: ZennColors.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: ZennColors.border)),
+      decoration: BoxDecoration(
+          color: ZennColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: ZennColors.border)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -268,18 +293,27 @@ class _StreakHero extends StatelessWidget {
             ),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text(hasStreak ? '🔥' : '💤', style: const TextStyle(fontSize: 26)),
-              Text('$streak', style: TextStyle(fontFamily: 'Inter', fontSize: 18, fontWeight: FontWeight.w800,
-                  color: hasStreak ? ZennColors.primary : ZennColors.textHint)),
+              Text('$streak',
+                  style: TextStyle(
+                      fontFamily: 'Inter', fontSize: 18, fontWeight: FontWeight.w800,
+                      color: hasStreak ? ZennColors.primary : ZennColors.textHint)),
             ]),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(hasStreak ? '$streak günlük seri!' : 'Seriyi başlat!',
-                  style: ZennTextStyles.headline3.copyWith(color: hasStreak ? ZennColors.primary : ZennColors.textDark)),
+              Text(
+                hasStreak
+                    ? s.streakCurrentDays.replaceFirst('{n}', '$streak')
+                    : s.streakBeginTitle,
+                style: ZennTextStyles.headline3.copyWith(
+                    color: hasStreak ? ZennColors.primary : ZennColors.textDark),
+              ),
               const SizedBox(height: 5),
-              Text(hasStreak ? _streakMessage(streak) : 'Her gün bir bulmaca çözerek serine başla ve aylık bonusu kazan.',
-                  style: ZennTextStyles.caption.copyWith(height: 1.5)),
+              Text(
+                hasStreak ? _streakMessage(streak, s) : s.streakBeginBody,
+                style: ZennTextStyles.caption.copyWith(height: 1.5),
+              ),
               if (hasStreak) ...[
                 const SizedBox(height: 10),
                 _StreakMiniBar(streak: streak),
@@ -291,12 +325,12 @@ class _StreakHero extends StatelessWidget {
     );
   }
 
-  String _streakMessage(int streak) {
-    if (streak >= 30) return 'Mükemmel! Tam ay boyunca hiç bırakmadın 🏆';
-    if (streak >= 14) return 'İnanılmaz! 2 haftadır her gün çözüyorsun 🌟';
-    if (streak >= 7)  return 'Harika! Bir haftadır kesintisiz devam ediyorsun ⚡';
-    if (streak >= 3)  return 'Güzel başlangıç! Devam edersen aylık bonusu kazanabilirsin.';
-    return 'Güzel! Seriyi korumaya devam et, her gün bir adım.';
+  String _streakMessage(int streak, AppStrings s) {
+    if (streak >= 30) return s.streakMsg30;
+    if (streak >= 14) return s.streakMsg14;
+    if (streak >= 7)  return s.streakMsg7;
+    if (streak >= 3)  return s.streakMsg3;
+    return s.streakMsg1;
   }
 }
 
@@ -333,6 +367,7 @@ class _TodayCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = strings(context);
     return FutureBuilder<List<dynamic>>(
       future: Future.wait([
         SupabaseService.instance.hasDailyCompleted(puzzle.id),
@@ -341,6 +376,7 @@ class _TodayCard extends ConsumerWidget {
       builder: (context, snap) {
         final isCompleted  = snap.data?[0] as bool? ?? false;
         final hasSavedGame = snap.data?[1] as bool? ?? false;
+        final isSignedIn   = ref.watch(profileProvider).valueOrNull != null;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -353,29 +389,40 @@ class _TodayCard extends ConsumerWidget {
               Container(
                 width: 44, height: 44,
                 decoration: BoxDecoration(
-                  color: isCompleted ? ZennColors.primary.withOpacity(0.1) : Colors.white.withOpacity(0.15),
+                  color: isCompleted
+                      ? ZennColors.primary.withOpacity(0.1)
+                      : Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(isCompleted ? Icons.check_circle_rounded : Icons.grid_on_rounded,
-                    color: isCompleted ? ZennColors.primary : Colors.white, size: 24),
+                child: Icon(
+                  isCompleted ? Icons.check_circle_rounded : Icons.grid_on_rounded,
+                  color: isCompleted ? ZennColors.primary : Colors.white,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(isCompleted ? 'Bugün tamamlandı' : 'Bugünün bulmacası',
-                      style: TextStyle(fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600,
-                          color: isCompleted ? ZennColors.primary : Colors.white)),
+                  Text(
+                    isCompleted ? s.todayCompleted : s.todayPuzzle,
+                    style: TextStyle(
+                        fontFamily: 'Inter', fontSize: 15, fontWeight: FontWeight.w600,
+                        color: isCompleted ? ZennColors.primary : Colors.white),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     isCompleted
-                      ? '+${AppConstants.diamondsDaily} elmas kazandın ✓'
-                      : ref.watch(profileProvider).valueOrNull != null
-                          ? 'Giriş yaparak elmas ve bonus kazan'
-                          : hasSavedGame
-                              ? 'Kaldığın yerden devam et'
-                              : '+${AppConstants.diamondsDaily} elmas • Aylık bonusa katıl',
-                    style: TextStyle(fontFamily: 'Inter', fontSize: 12,
-                        color: isCompleted ? ZennColors.primary.withOpacity(0.7) : Colors.white.withOpacity(0.8)),
+                        ? s.todayDiamondsEarned.replaceFirst('{n}', '${AppConstants.diamondsDaily}')
+                        : !isSignedIn
+                            ? s.todaySignInEarn
+                            : hasSavedGame
+                                ? s.dailyContinue
+                                : s.todayDiamondsBonus.replaceFirst('{n}', '${AppConstants.diamondsDaily}'),
+                    style: TextStyle(
+                        fontFamily: 'Inter', fontSize: 12,
+                        color: isCompleted
+                            ? ZennColors.primary.withOpacity(0.7)
+                            : Colors.white.withOpacity(0.8)),
                   ),
                 ]),
               ),
@@ -397,8 +444,12 @@ class _TodayCard extends ConsumerWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                    child: Text(hasSavedGame ? 'Devam' : 'Oyna',
-                        style: const TextStyle(fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w700, color: ZennColors.primary)),
+                    child: Text(
+                      hasSavedGame ? s.dailyResume : s.dailyPlay,
+                      style: const TextStyle(
+                          fontFamily: 'Inter', fontSize: 14,
+                          fontWeight: FontWeight.w700, color: ZennColors.primary),
+                    ),
                   ),
                 ),
             ],
@@ -413,54 +464,75 @@ class _NoPuzzleCard extends StatelessWidget {
   const _NoPuzzleCard();
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(color: ZennColors.cardMedium, borderRadius: BorderRadius.circular(16)),
-    child: const Center(child: Text('Bugün için bulmaca hazır değil. Yakında!', textAlign: TextAlign.center, style: ZennTextStyles.body)),
-  );
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: ZennColors.cardMedium, borderRadius: BorderRadius.circular(16)),
+        child: Center(
+          child: Text(strings(context).dailyNoPuzzle,
+              textAlign: TextAlign.center, style: ZennTextStyles.body),
+        ),
+      );
 }
 
 class _PuzzleCardSkeleton extends StatelessWidget {
   const _PuzzleCardSkeleton();
   @override
   Widget build(BuildContext context) => Container(
-    height: 72,
-    decoration: BoxDecoration(color: ZennColors.cardMedium, borderRadius: BorderRadius.circular(16)),
-  );
+        height: 72,
+        decoration: BoxDecoration(color: ZennColors.cardMedium, borderRadius: BorderRadius.circular(16)),
+      );
 }
 
 // ─── Month Calendar ───────────────────────────────────────────────────────────
 
 class _MonthCalendar extends StatelessWidget {
-  final int year;
-  final int month;
+  final int year, month;
   final Set<String> completedDates;
   final DateTime today;
-  const _MonthCalendar({required this.year, required this.month, required this.completedDates, required this.today});
+  const _MonthCalendar({
+    required this.year, required this.month,
+    required this.completedDates, required this.today,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final daysInMonth = DateTimeRange(start: DateTime(year, month), end: DateTime(year, month + 1)).duration.inDays;
+    final s           = strings(context);
+    final daysInMonth = DateTimeRange(
+      start: DateTime(year, month), end: DateTime(year, month + 1),
+    ).duration.inDays;
     final offset = DateTime(year, month, 1).weekday - 1;
 
     return Container(
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: ZennColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: ZennColors.border)),
+      decoration: BoxDecoration(
+          color: ZennColors.surface, borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: ZennColors.border)),
       child: Column(
         children: [
-          Row(children: ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'].map((d) =>
-              Expanded(child: Center(child: Text(d, style: ZennTextStyles.caption.copyWith(fontWeight: FontWeight.w600))))).toList()),
+          Row(
+            children: s.weekdays.map((d) => Expanded(
+              child: Center(
+                child: Text(d, style: ZennTextStyles.caption.copyWith(fontWeight: FontWeight.w600)),
+              ),
+            )).toList(),
+          ),
           const SizedBox(height: 10),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             padding: EdgeInsets.zero,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 4, crossAxisSpacing: 4),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7, mainAxisSpacing: 4, crossAxisSpacing: 4),
             itemCount: offset + daysInMonth,
             itemBuilder: (_, i) {
               if (i < offset) return const SizedBox.shrink();
               final day = i - offset + 1;
-              final dateStr = '${year.toString().padLeft(4,'0')}-${month.toString().padLeft(2,'0')}-${day.toString().padLeft(2,'0')}';
-              return _CalendarDay(day: day, isToday: day == today.day, isCompleted: completedDates.contains(dateStr), isFuture: day > today.day);
+              final dateStr = '${year.toString().padLeft(4, '0')}-'
+                  '${month.toString().padLeft(2, '0')}-'
+                  '${day.toString().padLeft(2, '0')}';
+              return _CalendarDay(
+                day: day, isToday: day == today.day,
+                isCompleted: completedDates.contains(dateStr), isFuture: day > today.day,
+              );
             },
           ),
         ],
@@ -472,18 +544,32 @@ class _MonthCalendar extends StatelessWidget {
 class _CalendarDay extends StatelessWidget {
   final int day;
   final bool isToday, isCompleted, isFuture;
-  const _CalendarDay({required this.day, required this.isToday, required this.isCompleted, required this.isFuture});
+  const _CalendarDay({
+    required this.day, required this.isToday,
+    required this.isCompleted, required this.isFuture,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final Color bg = isCompleted ? ZennColors.primary : isToday ? ZennColors.cardLight : isFuture ? Colors.transparent : ZennColors.surfaceAlt;
-    final Color tc = isCompleted ? Colors.white : isToday ? ZennColors.primary : isFuture ? ZennColors.textHint : ZennColors.textMid;
+    final Color bg = isCompleted ? ZennColors.primary
+        : isToday ? ZennColors.cardLight
+        : isFuture ? Colors.transparent
+        : ZennColors.surfaceAlt;
+    final Color tc = isCompleted ? Colors.white
+        : isToday ? ZennColors.primary
+        : isFuture ? ZennColors.textHint
+        : ZennColors.textMid;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8),
-          border: isToday && !isCompleted ? Border.all(color: ZennColors.primary, width: 1.5) : null),
-      child: Center(child: Text(day.toString(),
-          style: TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600, color: tc))),
+      decoration: BoxDecoration(
+        color: bg, borderRadius: BorderRadius.circular(8),
+        border: isToday && !isCompleted ? Border.all(color: ZennColors.primary, width: 1.5) : null,
+      ),
+      child: Center(
+        child: Text(day.toString(),
+            style: TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w600, color: tc)),
+      ),
     );
   }
 }
@@ -496,27 +582,48 @@ class _MonthlyProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s        = strings(context);
     final progress = totalDays > 0 ? completedCount / totalDays : 0.0;
+
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: ZennColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: ZennColors.border)),
+      decoration: BoxDecoration(
+          color: ZennColors.surface, borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: ZennColors.border)),
       child: Row(
         children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Aylık İlerleme', style: ZennTextStyles.bodyMedium.copyWith(color: ZennColors.textDark)),
-            const SizedBox(height: 2),
-            Text('$completedCount / $totalDays gün tamamlandı', style: ZennTextStyles.caption),
-            const SizedBox(height: 10),
-            ClipRRect(borderRadius: BorderRadius.circular(100),
-                child: LinearProgressIndicator(value: progress.clamp(0.0, 1.0), minHeight: 8,
-                    backgroundColor: ZennColors.border, valueColor: const AlwaysStoppedAnimation(ZennColors.primary))),
-          ])),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(s.monthlyProgress,
+                  style: ZennTextStyles.bodyMedium.copyWith(color: ZennColors.textDark)),
+              const SizedBox(height: 2),
+              Text(
+                s.dailyProgressDays
+                    .replaceFirst('{c}', '$completedCount')
+                    .replaceFirst('{t}', '$totalDays'),
+                style: ZennTextStyles.caption,
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(100),
+                child: LinearProgressIndicator(
+                  value: progress.clamp(0.0, 1.0), minHeight: 8,
+                  backgroundColor: ZennColors.border,
+                  valueColor: const AlwaysStoppedAnimation(ZennColors.primary),
+                ),
+              ),
+            ]),
+          ),
           const SizedBox(width: 16),
           Container(
             width: 52, height: 52,
             decoration: const BoxDecoration(color: ZennColors.cardLight, shape: BoxShape.circle),
-            child: Center(child: Text('${(progress * 100).round()}%',
-                style: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w700, color: ZennColors.primary))),
+            child: Center(
+              child: Text('${(progress * 100).round()}%',
+                  style: const TextStyle(
+                      fontFamily: 'Inter', fontSize: 13,
+                      fontWeight: FontWeight.w700, color: ZennColors.primary)),
+            ),
           ),
         ],
       ),

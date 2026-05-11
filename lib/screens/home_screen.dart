@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../core/theme.dart';
 import '../core/constants.dart';
+import '../core/l10n.dart';
 import '../providers/game_provider.dart';
 import '../widgets/common_widgets.dart';
 import '../services/sudoku_generator.dart';
@@ -17,6 +18,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
+    final s = strings(context);
 
     return Scaffold(
       backgroundColor: ZennColors.background,
@@ -34,18 +36,18 @@ class HomeScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_greeting(), style: ZennTextStyles.caption),
+                        Text(_greeting(context), style: ZennTextStyles.caption),
                         const SizedBox(height: 2),
                         profile.when(
                           data: (p) => Text(
-                            p?.username ?? 'Oyuncu',
+                            p?.username ?? s.playerDefault,
                             style: ZennTextStyles.headline2,
                           ),
                           loading: () => const SizedBox(
                               height: 24,
                               width: 100,
                               child: LinearProgressIndicator()),
-                          error: (_, __) => const Text('Oyuncu'),
+                          error: (_, __) => Text(s.playerDefault),
                         ),
                       ],
                     ),
@@ -87,7 +89,7 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 24),
 
               // ── Hızlı Oyun ─────────────────────────────────────────────
-              Text('Hızlı Oyun', style: ZennTextStyles.headline3),
+              Text(s.quickPlay, style: ZennTextStyles.headline3),
               const SizedBox(height: 14),
               const _DifficultyGrid(),
 
@@ -105,11 +107,12 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  String _greeting() {
+  String _greeting(BuildContext context) {
+    final s = strings(context);
     final h = DateTime.now().hour;
-    if (h < 12) return 'Günaydın 🌤';
-    if (h < 17) return 'İyi günler ☀️';
-    return 'İyi akşamlar 🌙';
+    if (h < 12) return '${s.greetingMorning} 🌤';
+    if (h < 17) return '${s.greetingAfternoon} ☀️';
+    return '${s.greetingEvening} 🌙';
   }
 }
 
@@ -121,7 +124,9 @@ class _DailyBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(profileProvider);
-    final today = DateFormat('d MMMM', 'tr').format(DateTime.now());
+    final s = strings(context);
+    final locale = Localizations.localeOf(context).languageCode;
+    final today = DateFormat('d MMMM', locale).format(DateTime.now());
 
     return GestureDetector(
       onTap: () => context.push(AppConstants.routeDaily),
@@ -167,9 +172,9 @@ class _DailyBanner extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Günün Sudokusu',
-                    style: TextStyle(
+                  Text(
+                    s.dailyBannerTitle,
+                    style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -183,8 +188,9 @@ class _DailyBanner extends ConsumerWidget {
                       const SizedBox(width: 5),
                       Text(
                         SupabaseService.instance.isSignedIn
-                        ? '+${AppConstants.diamondsDaily} Elmas kazan'
-                        : 'Giriş yap, 10 Elmas kazan',
+                            ? s.earnDiamonds.replaceFirst(
+                                '{n}', '${AppConstants.diamondsDaily}')
+                            : s.signInEarnDiamonds,
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 13,
@@ -241,33 +247,43 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
   late AnimationController _pressCtrl;
   late Animation<double> _pressScale;
 
-  // Zorluk seviyesine göre renk ve doluluk oranı
+  // Sadece görsel config (renkler ve doluluk) — etiketler build'de strings(context)'ten alınır
   static const _config = {
     Difficulty.easy: (
       color: Color(0xFF1A6B4A),
       fillColor: Color(0xFFE8F5EE),
       accentColor: Color(0xFF1A6B4A),
       barFill: 0.33,
-      label: 'Kolay',
-      sub: 'Başlangıç',
     ),
     Difficulty.medium: (
       color: Color(0xFF855A00),
       fillColor: Color(0xFFFFF3E0),
       accentColor: Color(0xFFE8A000),
       barFill: 0.66,
-      label: 'Orta',
-      sub: 'Orta Seviye',
     ),
     Difficulty.hard: (
       color: Color(0xFFBA1A1A),
       fillColor: Color(0xFFFFEDED),
       accentColor: Color(0xFFBA1A1A),
       barFill: 1.0,
-      label: 'Zor',
-      sub: 'Uzman',
     ),
   };
+
+  String _label(AppStrings s) {
+    switch (widget.difficulty) {
+      case Difficulty.easy:   return s.diffEasy;
+      case Difficulty.medium: return s.diffMedium;
+      case Difficulty.hard:   return s.diffHard;
+    }
+  }
+
+  String _sub(AppStrings s) {
+    switch (widget.difficulty) {
+      case Difficulty.easy:   return s.diffEasySub;
+      case Difficulty.medium: return s.diffMediumSub;
+      case Difficulty.hard:   return s.diffHardSub;
+    }
+  }
 
   @override
   void initState() {
@@ -286,6 +302,7 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
 
   @override
   Widget build(BuildContext context) {
+    final s = strings(context);
     final cfg = _config[widget.difficulty]!;
 
     return GestureDetector(
@@ -318,13 +335,13 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
             children: [
               // Seviye adı
               Text(
-                cfg.label,
+                _label(s),
                 style: ZennTextStyles.headline3.copyWith(
                   color: cfg.color,
                 ),
               ),
               const SizedBox(height: 2),
-              Text(cfg.sub, style: ZennTextStyles.caption),
+              Text(_sub(s), style: ZennTextStyles.caption),
 
               const SizedBox(height: 12),
 
@@ -349,7 +366,7 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
                   ),
                   const SizedBox(width: 3),
                   Text(
-                    'Elmas',
+                    s.diamondsLabel,
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 11,
@@ -367,6 +384,8 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
   }
 
   Future<void> _onTap() async {
+    // Async gap öncesinde strings'i al
+    final s = strings(context);
     final notifier = ref.read(gameProvider.notifier);
     final prefs = await SharedPreferences.getInstance();
     final key = 'saved_game_${widget.difficulty.labelEn}';
@@ -377,17 +396,16 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
       final resume = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Kayıtlı Oyun'),
-          content:
-              const Text('Kaldığın yerden devam etmek ister misin?'),
+          title: Text(s.savedGameTitle),
+          content: Text(s.savedGameBody),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Yeni Oyun'),
+              child: Text(s.savedGameNew),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Devam Et'),
+              child: Text(s.savedGameContinue),
             ),
           ],
         ),
@@ -413,7 +431,7 @@ class _DifficultyCardState extends ConsumerState<_DifficultyCard>
 // ─── Seviye Çubuğu ────────────────────────────────────────────────────────────
 
 class _LevelBar extends StatelessWidget {
-  final double fill;    // 0.0 → 1.0
+  final double fill;
   final Color color;
   const _LevelBar({required this.fill, required this.color});
 
@@ -422,11 +440,9 @@ class _LevelBar extends StatelessWidget {
     return LayoutBuilder(
       builder: (_, constraints) {
         final totalW = constraints.maxWidth;
-        // 3 segment, aralarında 3px boşluk
         const segCount = 3;
         const gap = 3.0;
         final segW = (totalW - gap * (segCount - 1)) / segCount;
-        // Kaç segment dolu: 0.33 → 1, 0.66 → 2, 1.0 → 3
         final filledCount = (fill * segCount).round();
 
         return Row(
@@ -440,9 +456,7 @@ class _LevelBar extends StatelessWidget {
                   width: segW,
                   height: 5,
                   decoration: BoxDecoration(
-                    color: filled
-                        ? color
-                        : color.withOpacity(0.12),
+                    color: filled ? color : color.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -463,34 +477,23 @@ class _StatsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = strings(context);
     final stats = ref.watch(completionStatsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('İstatistikler', style: ZennTextStyles.headline3),
+        Text(s.statsTitle, style: ZennTextStyles.headline3),
         const SizedBox(height: 14),
         stats.when(
-          data: (s) => Row(
+          data: (st) => Row(
             children: [
-              _StatTile(
-                  label: 'Kolay',
-                  count: s['easy'] ?? 0,
-                  color: ZennColors.easy),
+              _StatTile(label: s.statsEasy,   count: st['easy']   ?? 0, color: ZennColors.easy),
               const SizedBox(width: 10),
-              _StatTile(
-                  label: 'Orta',
-                  count: s['medium'] ?? 0,
-                  color: ZennColors.medium),
+              _StatTile(label: s.statsMedium, count: st['medium'] ?? 0, color: ZennColors.medium),
               const SizedBox(width: 10),
-              _StatTile(
-                  label: 'Zor',
-                  count: s['hard'] ?? 0,
-                  color: ZennColors.hard),
+              _StatTile(label: s.statsHard,   count: st['hard']   ?? 0, color: ZennColors.hard),
               const SizedBox(width: 10),
-              _StatTile(
-                  label: 'Günlük',
-                  count: s['daily'] ?? 0,
-                  color: ZennColors.daily),
+              _StatTile(label: s.statsDaily,  count: st['daily']  ?? 0, color: ZennColors.daily),
             ],
           ),
           loading: () => const LinearProgressIndicator(),
@@ -546,6 +549,7 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = strings(context);
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -560,21 +564,21 @@ class _BottomNav extends StatelessWidget {
               _NavItem(
                 icon: Icons.grid_view_rounded,
                 iconFilled: Icons.grid_view_rounded,
-                label: 'Ana Sayfa',
+                label: s.navHome,
                 active: currentIndex == 0,
                 onTap: () => context.go(AppConstants.routeHome),
               ),
               _NavItem(
                 icon: Icons.calendar_today_outlined,
                 iconFilled: Icons.calendar_today_rounded,
-                label: 'Günlük',
+                label: s.navDaily,
                 active: currentIndex == 1,
                 onTap: () => context.push(AppConstants.routeDaily),
               ),
               _NavItem(
                 icon: Icons.person_outline_rounded,
                 iconFilled: Icons.person_rounded,
-                label: 'Profil',
+                label: s.navProfile,
                 active: currentIndex == 2,
                 onTap: () => context.push(AppConstants.routeProfile),
               ),
@@ -634,8 +638,7 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 11,
-                fontWeight:
-                    active ? FontWeight.w600 : FontWeight.w500,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                 color: active ? ZennColors.primary : ZennColors.textHint,
               ),
             ),

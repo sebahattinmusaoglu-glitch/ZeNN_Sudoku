@@ -31,17 +31,25 @@ class AppConstants {
   static const String routeDaily      = '/daily';
   static const String routeProfile    = '/profile';
   static const String routeAbout      = '/about';
-  static const String routeAuth       = '/auth';        // ← eklendi       // ← eklendi
+  static const String routeAuth       = '/auth';
+
+  // ── App Info ──────────────────────────────────────────────
+  static const String appName      = 'ZeNN Sudoku';
+  static const String studio       = 'Zenn App Studio';
+  static const String appVersion   = '1.0.0';
+  static const String packageName  = 'com.zennappstudio.zenn_sudoku';
+  static const String supportEmail = 'hello@zennappstudio.com';
 
   // ── Misc ──────────────────────────────────────────────────
-  static const String appName  = 'ZeNN Sudoku';
-  static const String studio   = 'Zenn App Studio';
   static const int maxMistakes = 3;
 }
 
 enum Difficulty { easy, medium, hard }
 
 extension DifficultyExt on Difficulty {
+  /// Türkçe etiket — geriye dönük uyumluluk için korundu.
+  /// UI'da lokalize label için game_screen / home_screen'deki
+  /// _diffLabel(d, s) helper'ını kullan.
   String get label {
     switch (this) {
       case Difficulty.easy:   return 'Kolay';
