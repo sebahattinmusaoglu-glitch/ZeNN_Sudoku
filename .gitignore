@@ -44,3 +44,5 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 zenn_sudoku.jks
+android/app/google-services.json
+android/app/google-services.json
