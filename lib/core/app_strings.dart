@@ -54,15 +54,18 @@ class AppStrings {
   final String gameTitle;
   final String gamePause;
   final String gameResume;
-  final String gameMistakes;       // "Hata"
-  final String gameTime;           // "Süre"
-  final String gameDiamondReward;  // "Ödül"
-  final String gamePaused;           // "Oyun Duraklatıldı"
-  final String gamePausedHint;       // "Devam etmek için ▶ tuşuna bas"
+  final String gameMistakes;
+  final String gameTime;
+  final String gameDiamondReward;
+  final String gamePaused;
+  final String gamePausedHint;
+  final String gameOverTitle;         // "Oyun Bitti"
+  final String gameOverBody;          // "3 hata yaptın."
+  final String gameOverTryAgain;      // "Tekrar Dene"
   final String gameCompleteTitle;
   final String gameCompleteSubtitle;
-  final String gameCompletedBody;    // "Bu sudokuyu tamamladın ve\n💎 +{n} elmas kazandın."
-  final String gameStartNew;         // "Yeni Oyun Başlat"
+  final String gameCompletedBody;
+  final String gameStartNew;
   final String gameCompleteTime;
   final String gameCompleteMistakes;
   final String gameCompleteDiamonds;
@@ -258,6 +261,9 @@ class AppStrings {
     required this.gameDiamondReward,
     required this.gamePaused,
     required this.gamePausedHint,
+    required this.gameOverTitle,
+    required this.gameOverBody,
+    required this.gameOverTryAgain,
     required this.gameCompleteTitle,
     required this.gameCompleteSubtitle,
     required this.gameCompletedBody,
@@ -437,6 +443,9 @@ class AppStrings {
     gameDiamondReward: 'Ödül',
     gamePaused: 'Oyun Duraklatıldı',
     gamePausedHint: 'Devam etmek için ▶ tuşuna bas',
+    gameOverTitle: 'Oyun Bitti',
+    gameOverBody: '3 hata yaptın. Tekrar denemek ister misin?',
+    gameOverTryAgain: 'Tekrar Dene',
     gameCompleteTitle: 'Tebrikler! 🎉',
     gameCompleteSubtitle: 'Sudokuyu tamamladın!',
     gameCompletedBody: 'Bu sudokuyu tamamladın ve\n💎 +{n} elmas kazandın.',
@@ -683,6 +692,9 @@ hello@zennappstudio.com''',
     gameDiamondReward: 'Reward',
     gamePaused: 'Game Paused',
     gamePausedHint: 'Tap ▶ to resume',
+    gameOverTitle: 'Game Over',
+    gameOverBody: 'You made 3 mistakes. Would you like to try again?',
+    gameOverTryAgain: 'Try Again',
     gameCompleteTitle: 'Congratulations! 🎉',
     gameCompleteSubtitle: 'Puzzle complete!',
     gameCompletedBody: 'You completed this puzzle and\nearned 💎 +{n} diamonds.',

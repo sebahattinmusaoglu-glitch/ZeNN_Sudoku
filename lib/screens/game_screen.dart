@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../core/theme.dart';
 import '../core/constants.dart';
+import '../core/l10n.dart';
 import '../providers/game_provider.dart';
 import '../widgets/sudoku_grid.dart';
 import '../widgets/number_pad.dart';
@@ -25,46 +26,53 @@ class _GameScreenState extends ConsumerState<GameScreen>
   late Animation<double>   _mistakeShakeAnim;
   final _bannerKey = UniqueKey();
   bool _isBannerLoaded = false;
-    
+
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  _mistakeShakeCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 400));
-  _mistakeShakeAnim =
-      Tween<double>(begin: 0.0, end: 1.0).animate(_mistakeShakeCtrl);
+    _mistakeShakeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
+    _mistakeShakeAnim =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_mistakeShakeCtrl);
 
-  // Banner reklamı yükle
-  AdService.instance.loadBanner(
-    onLoaded: () {
-      if (mounted) setState(() => _isBannerLoaded = true);
-    },
-  );
-  _loadRewarded();
+    AdService.instance.loadBanner(
+      onLoaded: () {
+        if (mounted) setState(() => _isBannerLoaded = true);
+      },
+    );
+    _loadRewarded();
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    ref.listenManual(gameProvider, (prev, next) {
-      if (prev?.isComplete == false && next?.isComplete == true) {
-        _onComplete();
-      }
-      if (prev != null && next != null &&
-          next.mistakeCount > prev.mistakeCount) {
-        _mistakeShakeCtrl.forward(from: 0);
-        if (ref.read(hapticEnabledProvider)) HapticFeedback.mediumImpact();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual(gameProvider, (prev, next) {
+        if (prev?.isComplete == false && next?.isComplete == true) {
+          _onComplete();
+        }
+        if (prev != null && next != null &&
+            next.mistakeCount > prev.mistakeCount) {
+          _mistakeShakeCtrl.forward(from: 0);
+          if (ref.read(hapticEnabledProvider)) HapticFeedback.mediumImpact();
+
+          // 3 hata → Kolay dışında oyun biter
+          final difficulty = next.puzzle.difficulty;
+          final isDaily    = next.puzzle.dailyId != null;
+          final isEasy     = difficulty == Difficulty.easy && !isDaily;
+          if (!isEasy && next.mistakeCount >= AppConstants.maxMistakes) {
+            _showGameOverDialog();
+          }
+        }
+      });
+      final state = ref.read(gameProvider);
+      if (state != null && state.isPaused) {
+        ref.read(gameProvider.notifier).togglePause();
       }
     });
-    final state = ref.read(gameProvider);
-    if (state != null && state.isPaused) {
-      ref.read(gameProvider.notifier).togglePause();
-    }
-  });
-}  // ← initState burada kapanıyor
+  }
 
-Future<void> _loadRewarded() async {
-  await AdService.instance.loadRewarded();
-}
-  
+  Future<void> _loadRewarded() async {
+    await AdService.instance.loadRewarded();
+  }
+
   @override
   void dispose() {
     _mistakeShakeCtrl.dispose();
@@ -85,6 +93,55 @@ Future<void> _loadRewarded() async {
     _showCompleteDialog();
   }
 
+  void _showGameOverDialog() {
+    final s = strings(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          const Text('❌', style: TextStyle(fontSize: 22)),
+          const SizedBox(width: 8),
+          Text(s.gameOverTitle,
+              style: const TextStyle(
+                  fontFamily: 'Inter', fontWeight: FontWeight.w700)),
+        ]),
+        content: Text(s.gameOverBody,
+            style: const TextStyle(fontFamily: 'Inter', fontSize: 14, height: 1.5)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.go(AppConstants.routeHome);
+            },
+            child: Text(s.gameCompleteGoHome,
+                style: const TextStyle(color: ZennColors.textSoft)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ZennColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              // Aynı bulmacayı sıfırla
+              final state = ref.read(gameProvider);
+              if (state != null) {
+                ref.read(gameProvider.notifier).restartGame();
+              }
+            },
+            child: Text(s.gameOverTryAgain,
+                style: const TextStyle(
+                    fontFamily: 'Inter', fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCompleteDialog() {
     final state = ref.read(gameProvider);
     if (state == null) return;
@@ -99,11 +156,11 @@ Future<void> _loadRewarded() async {
       builder: (_) => Dialog(
         backgroundColor: Colors.transparent,
         child: _CompleteModal(
-          diamonds:   diamonds,
-          time:       state.elapsedFormatted,
-          mistakes:   state.mistakeCount,
-          difficulty: state.puzzle.difficulty,
-          onContinue: () { Navigator.pop(context); context.go(AppConstants.routeHome); },
+          diamonds:    diamonds,
+          time:        state.elapsedFormatted,
+          mistakes:    state.mistakeCount,
+          difficulty:  state.puzzle.difficulty,
+          onContinue:  () { Navigator.pop(context); context.go(AppConstants.routeHome); },
           onPlayAgain: () { Navigator.pop(context); context.go(AppConstants.routeHome); },
         ),
       ),
@@ -143,49 +200,20 @@ Future<void> _loadRewarded() async {
                 children: [
                   const SudokuGrid(),
                   if (state.isPaused && !state.isComplete)
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: ZennColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.pause_circle_outline_rounded,
-                                  size: 56, color: Colors.white),
-                              SizedBox(height: 12),
-                              Text('Oyun Duraklatıldı',
-                                  style: TextStyle(fontFamily: 'Inter',
-                                      fontSize: 20, fontWeight: FontWeight.w600,
-                                      color: Colors.white)),
-                              SizedBox(height: 6),
-                              Text('Devam etmek için ▶ tuşuna bas',
-                                  style: TextStyle(fontFamily: 'Inter',
-                                      fontSize: 13, color: Colors.white70)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    Positioned.fill(child: _PauseOverlay()),
                   if (state.isComplete)
                     Positioned.fill(
                       child: _CompletedOverlay(
                         diamonds: state.puzzle.dailyId != null
                             ? AppConstants.diamondsDaily
                             : state.puzzle.difficulty.diamonds,
-                        onNewGame: () => context.go(AppConstants.routeHome)
+                        onNewGame: () => context.go(AppConstants.routeHome),
                       ),
                     ),
                 ],
               ),
-             // const SizedBox(height: 16),
               const NumberPad(),
               const Spacer(),
-
-              //const SizedBox(height: 8),
-              // ── Banner reklam alanı ───────────────────────────────
               SafeArea(
                 top: false,
                 child: _BannerAdWidget(key: _bannerKey, isLoaded: _isBannerLoaded),
@@ -198,21 +226,54 @@ Future<void> _loadRewarded() async {
   }
 }
 
-// ─── Banner Ad Widget ─────────────────────────────────────────────────────────
+// ─── Banner Ad ────────────────────────────────────────────────────────────────
 
 class _BannerAdWidget extends StatelessWidget {
   final bool isLoaded;
-  const _BannerAdWidget({super.key, required this.isLoaded}); 
+  const _BannerAdWidget({super.key, required this.isLoaded});
 
   @override
   Widget build(BuildContext context) {
     if (!isLoaded || AdService.instance.bannerAd == null) {
-      return const SizedBox(height: 70); 
+      return const SizedBox(height: 70);
     }
     return SizedBox(
-      width: AdService.instance.bannerAd!.size.width.toDouble(),
+      width:  AdService.instance.bannerAd!.size.width.toDouble(),
       height: AdService.instance.bannerAd!.size.height.toDouble(),
-      child: AdWidget(ad: AdService.instance.bannerAd!),
+      child:  AdWidget(ad: AdService.instance.bannerAd!),
+    );
+  }
+}
+
+// ─── Pause Overlay ────────────────────────────────────────────────────────────
+
+class _PauseOverlay extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final s = strings(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: ZennColors.primary,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.pause_circle_outline_rounded,
+                size: 56, color: Colors.white),
+            const SizedBox(height: 12),
+            Text(s.gamePaused,
+                style: const TextStyle(
+                    fontFamily: 'Inter', fontSize: 20,
+                    fontWeight: FontWeight.w600, color: Colors.white)),
+            const SizedBox(height: 6),
+            Text(s.gamePausedHint,
+                style: const TextStyle(
+                    fontFamily: 'Inter', fontSize: 13, color: Colors.white70)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -225,6 +286,12 @@ class _TopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = strings(context);
+
+    final title = state.puzzle.dailyId != null
+        ? s.dailyTitle
+        : '${_diffLabel(state.puzzle.difficulty, s)} Sudoku';
+
     return Row(
       children: [
         GestureDetector(
@@ -239,14 +306,7 @@ class _TopBar extends ConsumerWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            state.puzzle.dailyId != null
-                ? 'Günün Sudokusu'
-                : '${state.puzzle.difficulty.label} Sudoku',
-            style: ZennTextStyles.headline3,
-          ),
-        ),
+        Expanded(child: Text(title, style: ZennTextStyles.headline3)),
         GestureDetector(
           onTap: () {
             if (ref.read(hapticEnabledProvider)) HapticFeedback.lightImpact();
@@ -266,6 +326,14 @@ class _TopBar extends ConsumerWidget {
       ],
     );
   }
+
+  String _diffLabel(Difficulty d, AppStrings s) {
+    switch (d) {
+      case Difficulty.easy:   return s.diffEasy;
+      case Difficulty.medium: return s.diffMedium;
+      case Difficulty.hard:   return s.diffHard;
+    }
+  }
 }
 
 // ─── Stats Row ────────────────────────────────────────────────────────────────
@@ -278,6 +346,7 @@ class _StatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        // Süre
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
@@ -286,16 +355,24 @@ class _StatsRow extends StatelessWidget {
             border: Border.all(color: ZennColors.border),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.timer_outlined, size: 16, color: ZennColors.textSoft),
+            const Icon(Icons.timer_outlined,
+                size: 16, color: ZennColors.textSoft),
             const SizedBox(width: 5),
             Text(state.elapsedFormatted,
-                style: const TextStyle(fontFamily: 'Inter', fontSize: 14,
+                style: const TextStyle(
+                    fontFamily: 'Inter', fontSize: 14,
                     fontWeight: FontWeight.w600, color: ZennColors.textDark)),
           ]),
         ),
         const SizedBox(width: 10),
-        _MistakeRow(mistakes: state.mistakeCount),
+        // Hata göstergesi — seviyeye göre farklı
+        _MistakeIndicator(
+          mistakes:   state.mistakeCount,
+          difficulty: state.puzzle.difficulty,
+          isDaily:    state.puzzle.dailyId != null,
+        ),
         const Spacer(),
+        // Elmas ödülü
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -306,7 +383,8 @@ class _StatsRow extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               '+${state.puzzle.dailyId != null ? AppConstants.diamondsDaily : state.puzzle.difficulty.diamonds}',
-              style: const TextStyle(fontFamily: 'Inter', fontSize: 13,
+              style: const TextStyle(
+                  fontFamily: 'Inter', fontSize: 13,
                   fontWeight: FontWeight.w700, color: ZennColors.primary),
             ),
           ]),
@@ -316,12 +394,51 @@ class _StatsRow extends StatelessWidget {
   }
 }
 
-class _MistakeRow extends StatelessWidget {
+// ─── Hata Göstergesi ─────────────────────────────────────────────────────────
+
+class _MistakeIndicator extends StatelessWidget {
   final int mistakes;
-  const _MistakeRow({required this.mistakes});
+  final Difficulty difficulty;
+  final bool isDaily;
+  const _MistakeIndicator({
+    required this.mistakes,
+    required this.difficulty,
+    required this.isDaily,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // Kolay seviyede (günlük hariç): sınırsız hata, sadece sayaç
+    final isEasy = difficulty == Difficulty.easy && !isDaily;
+
+    if (isEasy) {
+      // Kalem ikonu + hata sayısı
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: mistakes > 0 ? ZennColors.errorLight : ZennColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: mistakes > 0 ? ZennColors.error.withOpacity(0.3) : ZennColors.border),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.edit_outlined,
+              size: 15,
+              color: mistakes > 0 ? ZennColors.error : ZennColors.textSoft),
+          const SizedBox(width: 5),
+          Text(
+            '$mistakes',
+            style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: mistakes > 0 ? ZennColors.error : ZennColors.textDark),
+          ),
+        ]),
+      );
+    }
+
+    // Orta / Zor / Günlük: 3 X ikonu (mevcut davranış)
     return Row(
       children: List.generate(AppConstants.maxMistakes, (i) {
         final active = i < mistakes;
@@ -329,7 +446,8 @@ class _MistakeRow extends StatelessWidget {
           padding: const EdgeInsets.only(right: 5),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: active ? 24 : 22, height: active ? 24 : 22,
+            width: active ? 24 : 22,
+            height: active ? 24 : 22,
             decoration: BoxDecoration(
               color: active ? ZennColors.errorLight : Colors.transparent,
               shape: BoxShape.circle,
@@ -361,8 +479,7 @@ class _CompletedOverlay extends StatefulWidget {
 class _CompletedOverlayState extends State<_CompletedOverlay>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double> _fade;
-  late Animation<double> _slide;
+  late Animation<double> _fade, _slide;
 
   @override
   void initState() {
@@ -381,6 +498,7 @@ class _CompletedOverlayState extends State<_CompletedOverlay>
 
   @override
   Widget build(BuildContext context) {
+    final s = strings(context);
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (_, __) => Opacity(
@@ -400,10 +518,13 @@ class _CompletedOverlayState extends State<_CompletedOverlay>
                   children: [
                     const Text('🏆', style: TextStyle(fontSize: 44)),
                     const SizedBox(height: 10),
-                    Text('Tebrikler!', style: ZennTextStyles.headline2, textAlign: TextAlign.center),
+                    Text(s.gameCompleteTitle,
+                        style: ZennTextStyles.headline2,
+                        textAlign: TextAlign.center),
                     const SizedBox(height: 8),
                     Text(
-                      'Bu sudokuyu tamamladın ve\n💎 +${widget.diamonds} elmas kazandın.',
+                      s.gameCompletedBody
+                          .replaceFirst('{n}', '${widget.diamonds}'),
                       style: ZennTextStyles.body.copyWith(height: 1.6),
                       textAlign: TextAlign.center,
                     ),
@@ -411,13 +532,16 @@ class _CompletedOverlayState extends State<_CompletedOverlay>
                     GestureDetector(
                       onTap: widget.onNewGame,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 28, vertical: 12),
                         decoration: BoxDecoration(
                             color: ZennColors.primary,
                             borderRadius: BorderRadius.circular(12)),
-                        child: const Text('Yeni Oyun Başlat',
-                            style: TextStyle(fontFamily: 'Inter', fontSize: 14,
-                                fontWeight: FontWeight.w600, color: Colors.white)),
+                        child: Text(s.gameStartNew,
+                            style: const TextStyle(
+                                fontFamily: 'Inter', fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white)),
                       ),
                     ),
                   ],
@@ -457,8 +581,10 @@ class _CompleteModalState extends State<_CompleteModal>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-    _scale = Tween(begin: 0.8, end: 1.0).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500));
+    _scale = Tween(begin: 0.8, end: 1.0).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
     _fade  = Tween(begin: 0.0, end: 1.0).animate(_ctrl);
     _ctrl.forward();
   }
@@ -468,11 +594,13 @@ class _CompleteModalState extends State<_CompleteModal>
 
   @override
   Widget build(BuildContext context) {
+    final s = strings(context);
     return FadeTransition(
       opacity: _fade,
       child: Container(
         margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(24)),
         child: ScaleTransition(
           scale: _scale,
           child: Padding(
@@ -482,30 +610,39 @@ class _CompleteModalState extends State<_CompleteModal>
               children: [
                 Container(
                   width: 90, height: 90,
-                  decoration: BoxDecoration(color: ZennColors.cardGreen, shape: BoxShape.circle),
-                  child: const Icon(Icons.workspace_premium_rounded, size: 50, color: ZennColors.primary),
+                  decoration: BoxDecoration(
+                      color: ZennColors.cardGreen, shape: BoxShape.circle),
+                  child: const Icon(Icons.workspace_premium_rounded,
+                      size: 50, color: ZennColors.primary),
                 ),
                 const SizedBox(height: 20),
-                const Text('Tebrikler! 🎉', style: ZennTextStyles.headline1, textAlign: TextAlign.center),
+                Text(s.gameCompleteTitle,
+                    style: ZennTextStyles.headline1,
+                    textAlign: TextAlign.center),
                 const SizedBox(height: 8),
-                Text('Sudokuyu tamamladın!', style: ZennTextStyles.body, textAlign: TextAlign.center),
+                Text(s.gameCompleteSubtitle,
+                    style: ZennTextStyles.body, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: ZennColors.background, borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(
+                      color: ZennColors.background,
+                      borderRadius: BorderRadius.circular(16)),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _ResultStat(label: 'Süre', value: widget.time),
-                      _ResultStat(label: 'Hata', value: '${widget.mistakes}/3'),
-                      _ResultStat(label: 'Elmas', value: '+${widget.diamonds}', highlight: true),
+                      _ResultStat(label: s.gameCompleteTime,      value: widget.time),
+                      _ResultStat(label: s.gameCompleteMistakes,  value: '${widget.mistakes}/3'),
+                      _ResultStat(label: s.gameCompleteDiamonds,  value: '+${widget.diamonds}', highlight: true),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                ZennButton(label: 'Ana Sayfaya Dön', onTap: widget.onContinue),
+                ZennButton(label: s.gameCompleteGoHome, onTap: widget.onContinue),
                 const SizedBox(height: 10),
-                TextButton(onPressed: widget.onPlayAgain, child: const Text('Tekrar Oyna')),
+                TextButton(
+                    onPressed: widget.onPlayAgain,
+                    child: Text(s.gameCompletePlayAgain)),
               ],
             ),
           ),
@@ -518,13 +655,16 @@ class _CompleteModalState extends State<_CompleteModal>
 class _ResultStat extends StatelessWidget {
   final String label, value;
   final bool highlight;
-  const _ResultStat({required this.label, required this.value, this.highlight = false});
+  const _ResultStat(
+      {required this.label, required this.value, this.highlight = false});
 
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      Text(value, style: TextStyle(fontFamily: 'Inter', fontSize: 20, fontWeight: FontWeight.w700,
-          color: highlight ? ZennColors.primary : ZennColors.textDark)),
+      Text(value,
+          style: TextStyle(
+              fontFamily: 'Inter', fontSize: 20, fontWeight: FontWeight.w700,
+              color: highlight ? ZennColors.primary : ZennColors.textDark)),
       const SizedBox(height: 2),
       Text(label, style: ZennTextStyles.caption),
     ]);
