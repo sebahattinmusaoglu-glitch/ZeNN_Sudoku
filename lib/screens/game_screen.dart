@@ -45,25 +45,23 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.listenManual(gameProvider, (prev, next) {
+        // Tamamlandı
         if (prev?.isComplete == false && next?.isComplete == true) {
           _onComplete();
         }
+        // Hata yapıldı → shake animasyonu
         if (prev != null && next != null &&
             next.mistakeCount > prev.mistakeCount) {
           _mistakeShakeCtrl.forward(from: 0);
           if (ref.read(hapticEnabledProvider)) HapticFeedback.mediumImpact();
-
-          // 3 hata → Kolay dışında oyun biter
-          final difficulty = next.puzzle.difficulty;
-          final isDaily    = next.puzzle.dailyId != null;
-          final isEasy     = difficulty == Difficulty.easy && !isDaily;
-          if (!isEasy && next.mistakeCount >= AppConstants.maxMistakes) {
-            _showGameOverDialog();
-          }
+        }
+        // Game over → haptic
+        if (prev?.isGameOver == false && next?.isGameOver == true) {
+          if (ref.read(hapticEnabledProvider)) HapticFeedback.heavyImpact();
         }
       });
       final state = ref.read(gameProvider);
-      if (state != null && state.isPaused) {
+      if (state != null && state.isPaused && !state.isGameOver) {
         ref.read(gameProvider.notifier).togglePause();
       }
     });
@@ -78,7 +76,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
     _mistakeShakeCtrl.dispose();
     AdService.instance.dispose();
     final state = ref.read(gameProvider);
-    if (state != null && !state.isPaused && !state.isComplete) {
+    if (state != null && !state.isPaused && !state.isComplete && !state.isGameOver) {
       ref.read(gameProvider.notifier).togglePause();
     }
     super.dispose();
@@ -91,55 +89,6 @@ class _GameScreenState extends ConsumerState<GameScreen>
     ref.invalidate(completionStatsProvider);
     if (!mounted) return;
     _showCompleteDialog();
-  }
-
-  void _showGameOverDialog() {
-    final s = strings(context);
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(children: [
-          const Text('❌', style: TextStyle(fontSize: 22)),
-          const SizedBox(width: 8),
-          Text(s.gameOverTitle,
-              style: const TextStyle(
-                  fontFamily: 'Inter', fontWeight: FontWeight.w700)),
-        ]),
-        content: Text(s.gameOverBody,
-            style: const TextStyle(fontFamily: 'Inter', fontSize: 14, height: 1.5)),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.go(AppConstants.routeHome);
-            },
-            child: Text(s.gameCompleteGoHome,
-                style: const TextStyle(color: ZennColors.textSoft)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ZennColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              // Aynı bulmacayı sıfırla
-              final state = ref.read(gameProvider);
-              if (state != null) {
-                ref.read(gameProvider.notifier).restartGame();
-              }
-            },
-            child: Text(s.gameOverTryAgain,
-                style: const TextStyle(
-                    fontFamily: 'Inter', fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showCompleteDialog() {
@@ -199,8 +148,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
               Stack(
                 children: [
                   const SudokuGrid(),
-                  if (state.isPaused && !state.isComplete)
+                  // Duraklatıldı overlay
+                  if (state.isPaused && !state.isComplete && !state.isGameOver)
                     Positioned.fill(child: _PauseOverlay()),
+                  // Tamamlandı overlay
                   if (state.isComplete)
                     Positioned.fill(
                       child: _CompletedOverlay(
@@ -210,13 +161,23 @@ class _GameScreenState extends ConsumerState<GameScreen>
                         onNewGame: () => context.go(AppConstants.routeHome),
                       ),
                     ),
+                  // Oyun bitti overlay — grid'i tamamen kilitler
+                  if (state.isGameOver)
+                    Positioned.fill(
+                      child: _GameOverOverlay(
+                        onTryAgain: () =>
+                            ref.read(gameProvider.notifier).restartGame(),
+                        onGoHome: () => context.go(AppConstants.routeHome),
+                      ),
+                    ),
                 ],
               ),
               const NumberPad(),
               const Spacer(),
               SafeArea(
                 top: false,
-                child: _BannerAdWidget(key: _bannerKey, isLoaded: _isBannerLoaded),
+                child: _BannerAdWidget(
+                    key: _bannerKey, isLoaded: _isBannerLoaded),
               ),
             ],
           ),
@@ -278,6 +239,121 @@ class _PauseOverlay extends StatelessWidget {
   }
 }
 
+// ─── Game Over Overlay ────────────────────────────────────────────────────────
+
+class _GameOverOverlay extends StatefulWidget {
+  final VoidCallback onTryAgain;
+  final VoidCallback onGoHome;
+  const _GameOverOverlay({
+    required this.onTryAgain,
+    required this.onGoHome,
+  });
+
+  @override
+  State<_GameOverOverlay> createState() => _GameOverOverlayState();
+}
+
+class _GameOverOverlayState extends State<_GameOverOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _fade, _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 350));
+    _fade  = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _slide = Tween<double>(begin: 16.0, end: 0.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = strings(context);
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => Opacity(
+        opacity: _fade.value,
+        child: Transform.translate(
+          offset: Offset(0, _slide.value),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // İkon
+                    Container(
+                      width: 72, height: 72,
+                      decoration: const BoxDecoration(
+                        color: ZennColors.errorLight,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close_rounded,
+                          size: 38, color: ZennColors.error),
+                    ),
+                    const SizedBox(height: 16),
+                    // Başlık
+                    Text(s.gameOverTitle,
+                        style: ZennTextStyles.headline2,
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 8),
+                    // Açıklama
+                    Text(s.gameOverBody,
+                        style: ZennTextStyles.body.copyWith(height: 1.6),
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 28),
+                    // Tekrar Dene butonu
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ZennColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        onPressed: widget.onTryAgain,
+                        child: Text(s.gameOverTryAgain,
+                            style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Ana Sayfaya Dön butonu
+                    TextButton(
+                      onPressed: widget.onGoHome,
+                      child: Text(s.gameCompleteGoHome,
+                          style: const TextStyle(
+                              fontFamily: 'Inter',
+                              color: ZennColors.textSoft)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Top Bar ─────────────────────────────────────────────────────────────────
 
 class _TopBar extends ConsumerWidget {
@@ -287,7 +363,6 @@ class _TopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = strings(context);
-
     final title = state.puzzle.dailyId != null
         ? s.dailyTitle
         : '${_diffLabel(state.puzzle.difficulty, s)} Sudoku';
@@ -307,22 +382,24 @@ class _TopBar extends ConsumerWidget {
         ),
         const SizedBox(width: 12),
         Expanded(child: Text(title, style: ZennTextStyles.headline3)),
-        GestureDetector(
-          onTap: () {
-            if (ref.read(hapticEnabledProvider)) HapticFeedback.lightImpact();
-            ref.read(gameProvider.notifier).togglePause();
-          },
-          child: Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-                color: ZennColors.surfaceAlt,
-                borderRadius: BorderRadius.circular(12)),
-            child: Icon(
-              state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-              size: 22, color: ZennColors.textDark,
+        // Pause butonu — game over veya tamamlandıysa gizle
+        if (!state.isGameOver && !state.isComplete)
+          GestureDetector(
+            onTap: () {
+              if (ref.read(hapticEnabledProvider)) HapticFeedback.lightImpact();
+              ref.read(gameProvider.notifier).togglePause();
+            },
+            child: Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                  color: ZennColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(
+                state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                size: 22, color: ZennColors.textDark,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -346,7 +423,6 @@ class _StatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Süre
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
@@ -365,14 +441,12 @@ class _StatsRow extends StatelessWidget {
           ]),
         ),
         const SizedBox(width: 10),
-        // Hata göstergesi — seviyeye göre farklı
         _MistakeIndicator(
           mistakes:   state.mistakeCount,
           difficulty: state.puzzle.difficulty,
           isDaily:    state.puzzle.dailyId != null,
         ),
         const Spacer(),
-        // Elmas ödülü
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -408,37 +482,34 @@ class _MistakeIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Kolay seviyede (günlük hariç): sınırsız hata, sadece sayaç
     final isEasy = difficulty == Difficulty.easy && !isDaily;
 
     if (isEasy) {
-      // Kalem ikonu + hata sayısı
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: mistakes > 0 ? ZennColors.errorLight : ZennColors.surface,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-              color: mistakes > 0 ? ZennColors.error.withOpacity(0.3) : ZennColors.border),
+              color: mistakes > 0
+                  ? ZennColors.error.withOpacity(0.3)
+                  : ZennColors.border),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.edit_outlined,
               size: 15,
               color: mistakes > 0 ? ZennColors.error : ZennColors.textSoft),
           const SizedBox(width: 5),
-          Text(
-            '$mistakes',
-            style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: mistakes > 0 ? ZennColors.error : ZennColors.textDark),
-          ),
+          Text('$mistakes',
+              style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: mistakes > 0 ? ZennColors.error : ZennColors.textDark)),
         ]),
       );
     }
 
-    // Orta / Zor / Günlük: 3 X ikonu (mevcut davranış)
     return Row(
       children: List.generate(AppConstants.maxMistakes, (i) {
         final active = i < mistakes;
@@ -631,9 +702,12 @@ class _CompleteModalState extends State<_CompleteModal>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _ResultStat(label: s.gameCompleteTime,      value: widget.time),
-                      _ResultStat(label: s.gameCompleteMistakes,  value: '${widget.mistakes}/3'),
-                      _ResultStat(label: s.gameCompleteDiamonds,  value: '+${widget.diamonds}', highlight: true),
+                      _ResultStat(label: s.gameCompleteTime,
+                          value: widget.time),
+                      _ResultStat(label: s.gameCompleteMistakes,
+                          value: '${widget.mistakes}/3'),
+                      _ResultStat(label: s.gameCompleteDiamonds,
+                          value: '+${widget.diamonds}', highlight: true),
                     ],
                   ),
                 ),

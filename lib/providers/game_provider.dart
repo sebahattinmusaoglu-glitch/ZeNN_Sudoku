@@ -18,6 +18,7 @@ class GameState {
   final int mistakeCount;
   final int elapsedSeconds;
   final bool isComplete;
+  final bool isGameOver;   // 3 hata → Kolay dışında oyun biter
   final bool isPaused;
   final bool isNoteMode;
   final List<List<Set<int>>> notes;
@@ -33,6 +34,7 @@ class GameState {
     this.mistakeCount = 0,
     this.elapsedSeconds = 0,
     this.isComplete = false,
+    this.isGameOver = false,
     this.isPaused = false,
     this.isNoteMode = false,
     required this.notes,
@@ -49,6 +51,7 @@ class GameState {
     int? mistakeCount,
     int? elapsedSeconds,
     bool? isComplete,
+    bool? isGameOver,
     bool? isPaused,
     bool? isNoteMode,
     List<List<Set<int>>>? notes,
@@ -65,6 +68,7 @@ class GameState {
       mistakeCount:   mistakeCount   ?? this.mistakeCount,
       elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
       isComplete:     isComplete     ?? this.isComplete,
+      isGameOver:     isGameOver     ?? this.isGameOver,
       isPaused:       isPaused       ?? this.isPaused,
       isNoteMode:     isNoteMode     ?? this.isNoteMode,
       notes:          notes          ?? this.notes,
@@ -92,16 +96,12 @@ class GameNotifier extends StateNotifier<GameState?> {
   }
 
   /// Aynı bulmacayı sıfırdan başlatır.
-  /// Tahta, given hücreler dışında temizlenir.
-  /// Hata sayacı, süre, geçmiş ve notlar sıfırlanır.
   void restartGame() {
     if (state == null) return;
     _timer?.cancel();
     _flashTimer?.cancel();
 
     final current = state!.puzzle;
-
-    // Tahtayı orijinal haline döndür: given olan hücreler kalır, diğerleri 0
     final resetBoard = List.generate(
       9,
       (r) => List.generate(
@@ -120,25 +120,23 @@ class GameNotifier extends StateNotifier<GameState?> {
     );
 
     final emptyNotes = List.generate(9, (_) => List.generate(9, (_) => <int>{}));
-
     state = GameState(
       puzzle:         resetPuzzle,
       notes:          emptyNotes,
       mistakeCount:   0,
       elapsedSeconds: 0,
+      isGameOver:     false,
       isPaused:       false,
     );
 
-    // Kaydedilmiş ilerlemeyi sil
     clearProgress(current.difficulty, isDaily: current.dailyId != null);
-
     _startTimer();
   }
 
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (state == null || state!.isPaused || state!.isComplete) return;
+      if (state == null || state!.isPaused || state!.isComplete || state!.isGameOver) return;
       state = state!.copyWith(elapsedSeconds: state!.elapsedSeconds + 1);
     });
   }
@@ -158,6 +156,8 @@ class GameNotifier extends StateNotifier<GameState?> {
   Future<void> saveProgress() async {
     if (state == null) return;
     final s = state!;
+    // Oyun bitmişse kaydetme
+    if (s.isComplete || s.isGameOver) return;
     final prefs = await SharedPreferences.getInstance();
     final key = s.puzzle.dailyId != null
         ? 'saved_game_daily'
@@ -195,14 +195,21 @@ class GameNotifier extends StateNotifier<GameState?> {
       final flatNotes = List<List<dynamic>>.from(data['notes']);
       final notes = List.generate(
           9, (r) => List.generate(9, (c) => Set<int>.from(flatNotes[r * 9 + c])));
+
+      final mistakes   = data['mistakes'] as int;
+      final isEasy     = difficulty == Difficulty.easy && !isDaily;
+      // Yüklenen oyun zaten game over durumundaysa işaretle
+      final isGameOver = !isEasy && mistakes >= AppConstants.maxMistakes;
+
       state = GameState(
         puzzle:         puzzle,
         notes:          notes,
         elapsedSeconds: data['elapsed'] as int,
-        mistakeCount:   data['mistakes'] as int,
-        isPaused:       true,
+        mistakeCount:   mistakes,
+        isGameOver:     isGameOver,
+        isPaused:       !isGameOver,
       );
-      _startTimer();
+      if (!isGameOver) _startTimer();
       return true;
     } catch (_) {
       return false;
@@ -216,7 +223,8 @@ class GameNotifier extends StateNotifier<GameState?> {
   }
 
   void selectCell(int row, int col) {
-    if (state == null || state!.isComplete) return;
+    // isGameOver veya isComplete ise input engelle
+    if (state == null || state!.isComplete || state!.isGameOver) return;
     final board = state!.puzzle.board;
     final val   = board[row][col];
     final hi    = <(int, int)>{};
@@ -231,6 +239,8 @@ class GameNotifier extends StateNotifier<GameState?> {
   void inputNumber(int num) {
     if (state == null) return;
     final s = state!;
+    // isGameOver veya isComplete ise input engelle
+    if (s.isComplete || s.isGameOver) return;
     if (s.selectedRow == null || s.selectedCol == null) return;
     final r = s.selectedRow!;
     final c = s.selectedCol!;
@@ -271,7 +281,6 @@ class GameNotifier extends StateNotifier<GameState?> {
           newNotes[rr][cc].remove(num);
     }
 
-    // Tamamlanan satır / sütun / kutu tespiti
     final flash = <(int, int)>{};
     if (num != 0 && !isMistake) {
       if (_isRowComplete(newBoard, r))
@@ -287,16 +296,32 @@ class GameNotifier extends StateNotifier<GameState?> {
       }
     }
 
+    final newMistakeCount = isMistake ? s.mistakeCount + 1 : s.mistakeCount;
+    final isEasy          = s.puzzle.difficulty == Difficulty.easy && s.puzzle.dailyId == null;
+    final newIsGameOver   = !isEasy && newMistakeCount >= AppConstants.maxMistakes;
+
     state = s.copyWith(
       puzzle:       newPuzzle,
       conflicts:    conflicts,
       highlights:   hi,
       history:      newHistory,
       notes:        newNotes,
-      mistakeCount: isMistake ? s.mistakeCount + 1 : s.mistakeCount,
+      mistakeCount: newMistakeCount,
       isComplete:   newPuzzle.isSolved,
+      isGameOver:   newIsGameOver,
       flashCells:   flash,
     );
+
+    // Game over olduğunda timer'ı durdur ve kaydı temizle
+    if (newIsGameOver) {
+      _timer?.cancel();
+      clearProgress(s.puzzle.difficulty, isDaily: s.puzzle.dailyId != null);
+    }
+
+    // Tamamlandığında kaydı temizle
+    if (newPuzzle.isSolved) {
+      clearProgress(s.puzzle.difficulty, isDaily: s.puzzle.dailyId != null);
+    }
 
     if (flash.isNotEmpty) {
       _flashTimer?.cancel();
@@ -305,7 +330,7 @@ class GameNotifier extends StateNotifier<GameState?> {
       });
     }
 
-    saveProgress();
+    if (!newIsGameOver) saveProgress();
   }
 
   bool _isRowComplete(List<List<int>> board, int r) {
@@ -343,6 +368,7 @@ class GameNotifier extends StateNotifier<GameState?> {
   Future<HintResult> useHintFree() async {
     if (state == null) return HintResult.noCell;
     final s = state!;
+    if (s.isGameOver) return HintResult.noCell;
     if (s.selectedRow == null || s.selectedCol == null) return HintResult.noCell;
     final r = s.selectedRow!;
     final c = s.selectedCol!;
@@ -363,6 +389,7 @@ class GameNotifier extends StateNotifier<GameState?> {
   Future<HintResult> useHint() async {
     if (state == null) return HintResult.noCell;
     final s = state!;
+    if (s.isGameOver) return HintResult.noCell;
     if (s.selectedRow == null || s.selectedCol == null) return HintResult.noCell;
     final r = s.selectedRow!;
     final c = s.selectedCol!;
@@ -399,8 +426,8 @@ class GameNotifier extends StateNotifier<GameState?> {
       difficulty: s.puzzle.difficulty, dailyId: s.puzzle.dailyId, date: s.puzzle.date,
     );
     state = s.copyWith(
-      puzzle:  newPuzzle,
-      history: s.history.sublist(0, s.history.length - 1),
+      puzzle:    newPuzzle,
+      history:   s.history.sublist(0, s.history.length - 1),
       conflicts: {},
     );
   }
