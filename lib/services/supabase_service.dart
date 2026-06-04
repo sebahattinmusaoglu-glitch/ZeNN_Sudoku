@@ -183,24 +183,41 @@ class SupabaseService {
 
   // ─── Monthly calendar ─────────────────────────────────────────────────────
 
-  Future<Set<String>> getMonthlyCompletions(int year, int month) async {
-    final userId = currentUser?.id;
-    if (userId == null) return {};
-    final data = await _client
-        .from('completions')
-        .select('daily_puzzles(date)')
-        .eq('user_id', userId)
-        .eq('puzzle_type', 'daily');
-    final Set<String> result = {};
-    for (final row in data as List) {
-      final dp = row['daily_puzzles'];
-      if (dp == null) continue;
-      final dateStr = dp['date'] as String;
-      final d = DateTime.parse(dateStr);
-      if (d.year == year && d.month == month) result.add(dateStr);
+Future<Set<String>> getMonthlyCompletions(int year, int month) async {
+  final userId = currentUser?.id;
+  if (userId == null) return {};
+
+  final prevMonth = month == 1 ? 12 : month - 1;
+  final prevYear  = month == 1 ? year - 1 : year;
+
+  final completions = await _client
+      .from('completions')
+      .select('daily_puzzle_id')
+      .eq('user_id', userId)
+      .eq('puzzle_type', 'daily');
+
+  if ((completions as List).isEmpty) return {};
+
+  final ids = completions
+      .map((r) => r['daily_puzzle_id'] as String)
+      .toList();
+
+  final puzzles = await _client
+      .from('daily_puzzles')
+      .select('date')
+      .inFilter('id', ids);
+
+  final Set<String> result = {};
+  for (final row in puzzles as List) {
+    final dateStr = row['date'] as String;
+    final d = DateTime.parse(dateStr);
+    if ((d.year == year    && d.month == month) ||
+        (d.year == prevYear && d.month == prevMonth)) {
+      result.add(dateStr);
     }
-    return result;
   }
+  return result;
+}
 
   Future<Map<String, int>> getCompletionStats() async {
     final userId = currentUser?.id;
@@ -229,11 +246,15 @@ class SupabaseService {
   }
 
   Future<int> getMonthlyPuzzleCount(int year, int month) async {
-    final data = await _client
-        .from('daily_puzzles')
-        .select('id')
-        .gte('date', '$year-${month.toString().padLeft(2,'0')}-01')
-        .lte('date', '$year-${month.toString().padLeft(2,'0')}-31');
-    return (data as List).length;
-  }
+  final firstDay = DateTime(year, month, 1);
+  final lastDay  = DateTime(year, month + 1, 1)
+      .subtract(const Duration(days: 1)); // ayın son günü
+
+  final data = await _client
+      .from('daily_puzzles')
+      .select('id')
+      .gte('date', '${firstDay.year}-${firstDay.month.toString().padLeft(2,'0')}-01')
+      .lte('date', '${lastDay.year}-${lastDay.month.toString().padLeft(2,'0')}-${lastDay.day.toString().padLeft(2,'0')}');
+  return (data as List).length;
+}
 }
