@@ -40,37 +40,37 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
     }
   }
 
-Future<void> _loadCalendar() async {
-  try {
-    final now       = DateTime.now();
-    final completed = await SupabaseService.instance
-        .getMonthlyCompletions(now.year, now.month);
+  Future<void> _loadCalendar() async {
+    try {
+      final now = DateTime.now();
+      final completed = await SupabaseService.instance
+          .getMonthlyCompletions(now.year, now.month);
 
-    // DEBUG — sonuçları görmek için
-    print('>>> completed dates: $completed');
-    print('>>> streak: ${_calcStreak(completed, now)}');
+      // DEBUG — sonuçları görmek için
+      print('>>> completed dates: $completed');
+      print('>>> streak: ${_calcStreak(completed, now)}');
 
-    final totalPuzzles = await SupabaseService.instance
-        .getMonthlyPuzzleCount(now.year, now.month);
-    if (mounted) {
-      setState(() {
-        _completedDates  = completed;
-        _totalPuzzleDays = totalPuzzles;
-        _currentStreak   = _calcStreak(completed, now);
-        _loadingCalendar = false;
-        _calendarLoaded  = true;
-      });
-    }
-  } catch (e) {
-    print('>>> _loadCalendar HATA: $e'); // ← hatayı görmek için
-    if (mounted) {
-      setState(() {
-        _loadingCalendar = false;
-        _calendarLoaded  = true;
-      });
+      final totalPuzzles = await SupabaseService.instance
+          .getMonthlyPuzzleCount(now.year, now.month);
+      if (mounted) {
+        setState(() {
+          _completedDates = completed;
+          _totalPuzzleDays = totalPuzzles;
+          _currentStreak = _calcStreak(completed, now);
+          _loadingCalendar = false;
+          _calendarLoaded = true;
+        });
+      }
+    } catch (e) {
+      print('>>> _loadCalendar HATA: $e'); // ← hatayı görmek için
+      if (mounted) {
+        setState(() {
+          _loadingCalendar = false;
+          _calendarLoaded = true;
+        });
+      }
     }
   }
-}
 
   int _calcStreak(Set<String> completed, DateTime now) {
     int streak = 0;
@@ -181,8 +181,11 @@ Future<void> _loadCalendar() async {
               ),
               const SizedBox(height: 14),
               _MonthlyProgress(
-                completedCount: _completedDates.length,
-                totalDays: _totalPuzzleDays,
+                completedCount: _completedDates
+                    .where((d) => d.startsWith(
+                        '${now.year}-${now.month.toString().padLeft(2, '0')}'))
+                    .length,
+                totalDays: DateTime(now.year, now.month + 1, 0).day,
               ),
               const SizedBox(height: 16),
               _loadingCalendar
